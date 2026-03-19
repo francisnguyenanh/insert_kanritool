@@ -175,6 +175,7 @@
         <button class="tab-btn"        onclick="switchTab('tab-excel')">Gen Script from Excel</button>
         <button class="tab-btn"        onclick="switchTab('tab-config')">DB Config</button>
         <button class="tab-btn"        onclick="switchTab('tab-excel-config')">Gen Script Config</button>
+        <button class="tab-btn"        onclick="window.location.href='/reproduce-db'" style="background:#1a5c9e;color:#fff;border-color:#1a5c9e;">&#x1F5C4; DB Reproducer</button>
     </div>
 
     <!-- ══════════════ TAB 1: DB Export ══════════════ -->
@@ -268,6 +269,9 @@
             <button id="genBtn" onclick="genFromExcel()">Generate insert_all.sql</button>
         </div>
         <div id="excelStatus" class="status-msg"></div>
+        <div id="colWarnings" style="display:none;margin-top:10px;font-size:12px;
+             border:1px solid #bbb;border-radius:4px;padding:10px 12px;
+             background:#fffef0;max-height:260px;overflow-y:auto;"></div>
     </div>
 
     <!-- ══════════════ TAB 4: Gen Script Config ══════════════ -->
@@ -288,6 +292,12 @@
             <textarea id="cfgExcludedSheets" style="height:80px;"></textarea>
             <p class="table-section-label" style="margin-bottom:4px;">Stop Values (one per line)</p>
             <textarea id="cfgStopValues" style="height:100px;"></textarea>
+        </fieldset>
+
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">Column Check — Skip List</legend>
+            <p class="hint" style="margin-bottom:6px;margin-top:0;">Column names listed here are excluded from the INSERT vs DB column check (e.g. auto-generated or default-NULL columns). One per line, case-insensitive.</p>
+            <textarea id="cfgSkipCheckColumns" style="height:100px;"></textarea>
         </fieldset>
 
         <fieldset>
@@ -467,6 +477,7 @@
         const btn = document.getElementById('genBtn');
         setBusy(btn, true, 'Generate insert_all.sql');
         hideMsg('excelStatus');
+        document.getElementById('colWarnings').style.display = 'none';
         showMsg('excelStatus', 'Processing... this may take a moment.', 'info');
 
         const formData = new FormData();
@@ -479,14 +490,37 @@
                 method: 'POST',
                 body: formData
             });
+            const result = await resp.json();
 
-            const ct = resp.headers.get('content-type') || '';
-            if (resp.ok && ct.includes('text/plain')) {
-                await downloadBlob(resp, 'insert_all.sql');
-                showMsg('excelStatus', 'insert_all.sql のダウンロード完了！', 'success');
+            if (result.status === 'success') {
+                // Decode base64 SQL and trigger download
+                const bytes = Uint8Array.from(atob(result.sql_b64), c => c.charCodeAt(0));
+                const blob  = new Blob([bytes], { type: 'text/plain;charset=utf-8' });
+                const url   = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'insert_all.sql';
+                document.body.appendChild(a); a.click();
+                a.remove(); URL.revokeObjectURL(url);
                 fileInput.value = '';
+
+                // Show warnings / OK messages
+                const ws = result.warnings || [];
+                if (ws.length) {
+                    const wBox = document.getElementById('colWarnings');
+                    wBox.innerHTML = '<strong style="font-size:13px;">Column Check Result:</strong><br>' +
+                        ws.map(w => {
+                            const color = w.startsWith('\u2705') ? '#155724'
+                                        : w.startsWith('\u26a0\ufe0f') ? '#856404' : '#333';
+                            return `<div style="margin-top:5px;color:${color};">${escapeHtml(w)}</div>`;
+                        }).join('');
+                    wBox.style.display = 'block';
+                }
+
+                const hasWarn = ws.some(w => w.startsWith('\u26a0\ufe0f'));
+                showMsg('excelStatus', 'insert_all.sql ダウンロード完了！' +
+                    (hasWarn ? ' ⚠️ カラム不一致あり。下のリストを確認してください。' : ''),
+                    hasWarn ? 'warning' : 'success');
             } else {
-                const result = await resp.json();
                 showMsg('excelStatus', result.message || 'エラーが発生しました', 'error');
             }
         } catch (err) {
@@ -494,6 +528,10 @@
         } finally {
             setBusy(btn, false, 'Generate insert_all.sql');
         }
+    }
+
+    function escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
     // Set today as default system date on load
@@ -523,6 +561,8 @@
                 JSON.stringify(gc.koumoku_type_mapping || {}, null, 2);
             document.getElementById('cfgKoumokuTypeMappingRe').value =
                 JSON.stringify(gc.koumoku_type_mapping_re || {}, null, 2);
+            document.getElementById('cfgSkipCheckColumns').value =
+                (gc.skip_check_columns || []).join('\n');
         } catch (err) {
             showMsg('excelConfigStatus', 'Network error: ' + err.message, 'error');
         }
@@ -556,6 +596,8 @@
                     .split('\n').map(s => s.trim()).filter(s => s),
                 excluded_sheetnames: document.getElementById('cfgExcludedSheets').value
                     .split('\n').map(s => s.trim()).filter(s => s),
+                skip_check_columns: document.getElementById('cfgSkipCheckColumns').value
+                    .split('\n').map(s => s.trim().toUpperCase()).filter(s => s),
             }
         };
 

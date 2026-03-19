@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DB Reproducer</title>
+
+    <!-- Bootstrap 5 CSS (CDN) -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        crossorigin="anonymous"
+    />
+    <!-- Bootstrap Icons (optional, used for button icon) -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+
+    <style>
+        /* ── Page layout ── */
+        body {
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            padding: 2rem 1rem;
+        }
+
+        .page-card {
+            max-width: 780px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.10);
+            overflow: hidden;
+        }
+
+        /* ── Header banner ── */
+        .page-header {
+            background: linear-gradient(135deg, #1a5c9e 0%, #0d3b6e 100%);
+            color: #fff;
+            padding: 1.25rem 1.75rem;
+        }
+        .page-header h1 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: 0.02em;
+        }
+        .page-header p {
+            font-size: 0.82rem;
+            opacity: 0.8;
+            margin: 0.25rem 0 0;
+        }
+
+        /* ── Inner nav pills ── */
+        .nav-pills .nav-link {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #555;
+            border-radius: 5px;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #1a5c9e;
+            color: #fff;
+        }
+
+        /* ── Log output console ── */
+        #log-output {
+            background: #0d0d0d;
+            color: #00e676;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            padding: 1rem;
+            min-height: 280px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            border: 1px solid #333;
+        }
+        #log-output .log-info    { color: #64b5f6; }
+        #log-output .log-success { color: #69f0ae; }
+        #log-output .log-warning { color: #ffd740; }
+        #log-output .log-error   { color: #ff5252; }
+
+        /* ── Start button ── */
+        #startBtn {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            padding: 0.65rem 2.5rem;
+        }
+
+        /* ── Config form labels ── */
+        .form-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-text {
+            font-size: 0.75rem;
+        }
+        .form-control, .form-select {
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-card">
+
+    <!-- ═══════ Top Navigation ═══════ -->
+    <div class="d-flex align-items-center px-3 py-2" style="background:#0d3b6e;border-bottom:1px solid rgba(255,255,255,0.12);">
+        <a href="/" class="btn btn-sm btn-outline-light" style="font-size:.78rem;">
+            <i class="bi bi-arrow-left me-1"></i>DB Export Tool
+        </a>
+        <span class="ms-3 text-white-50" style="font-size:.78rem;">DB Export Tool &nbsp;/&nbsp; DB Reproducer</span>
+    </div>
+
+    <!-- ═══════ Page Header ═══════ -->
+    <div class="page-header">
+        <h1><i class="bi bi-database-gear me-2"></i>DB Reproducer</h1>
+        <p>Clone a remote SQL Server database to your local environment for development &amp; testing.</p>
+    </div>
+
+    <!-- ═══════ Inner Tab Navigation (Pills) ═══════ -->
+    <div class="px-4 pt-3 pb-0">
+        <ul class="nav nav-pills gap-2" id="reproTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link active"
+                    id="pill-migration-tab"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pill-migration"
+                    type="button"
+                    role="tab"
+                    aria-controls="pill-migration"
+                    aria-selected="true"
+                >
+                    <i class="bi bi-play-circle me-1"></i>Migration Control
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button
+                    class="nav-link"
+                    id="pill-config-tab"
+                    data-bs-toggle="pill"
+                    data-bs-target="#pill-config"
+                    type="button"
+                    role="tab"
+                    aria-controls="pill-config"
+                    aria-selected="false"
+                >
+                    <i class="bi bi-sliders me-1"></i>Configuration
+                </button>
+            </li>
+        </ul>
+        <hr class="mt-2 mb-0" />
+    </div>
+
+    <!-- ═══════ Tab Contents ═══════ -->
+    <div class="tab-content px-4 py-4" id="reproTabContent">
+
+        <!-- ───────────────────────────────────────────
+             TAB 1: Migration Control
+        ─────────────────────────────────────────── -->
+        <div
+            class="tab-pane fade show active"
+            id="pill-migration"
+            role="tabpanel"
+            aria-labelledby="pill-migration-tab"
+        >
+            <h6 class="text-muted mb-3 text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">
+                Reproduction Process
+            </h6>
+
+            <!-- Start button row -->
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <button
+                    id="startBtn"
+                    class="btn btn-primary"
+                    onclick="startReproduction()"
+                >
+                    <i class="bi bi-play-fill me-2"></i>Start Reproduction Process
+                </button>
+                <!-- Status badge shown while running -->
+                <span id="statusBadge" class="badge bg-secondary d-none">Idle</span>
+            </div>
+
+            <!-- Progress bar (hidden until process starts) -->
+            <div id="progressWrapper" class="mb-3 d-none">
+                <div class="d-flex justify-content-between mb-1" style="font-size:.78rem;">
+                    <span id="progressLabel">Processing...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress" style="height:8px;">
+                    <div
+                        id="progressBar"
+                        class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                        role="progressbar"
+                        style="width: 0%"
+                        aria-valuenow="0"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    ></div>
+                </div>
+            </div>
+
+            <!-- Log console -->
+            <div class="mb-1 d-flex justify-content-between align-items-center">
+                <span style="font-size:.8rem;font-weight:600;color:#555;">Process Log</span>
+                <button
+                    class="btn btn-sm btn-outline-secondary py-0 px-2"
+                    style="font-size:.75rem;"
+                    onclick="clearLog()"
+                    title="Clear log"
+                >
+                    <i class="bi bi-eraser"></i> Clear
+                </button>
+            </div>
+            <!-- Log output: populated by JS / AJAX streaming -->
+            <div id="log-output">
+                <span class="log-info">// Waiting to start...</span>
+            </div>
+        </div>
+        <!-- end TAB 1 -->
+
+
+        <!-- ───────────────────────────────────────────
+             TAB 2: Configuration
+        ─────────────────────────────────────────── -->
+        <div
+            class="tab-pane fade"
+            id="pill-config"
+            role="tabpanel"
+            aria-labelledby="pill-config-tab"
+        >
+            <h6 class="text-muted mb-3 text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">
+                Connection &amp; Database Settings
+            </h6>
+
+            <form id="configForm" onsubmit="saveConfig(event)" novalidate>
+
+                <!-- ── Connection Strings ── -->
+                <fieldset class="border rounded p-3 mb-4">
+                    <legend class="float-none w-auto px-2"
+                        style="font-size:.8rem;font-weight:700;color:#444;">
+                        Connection Strings
+                    </legend>
+
+                    <!-- Source (SQL Server A) -->
+                    <div class="mb-3">
+                        <label for="srcConnStr" class="form-label">
+                            SQL Server A (Source) Connection String
+                            <span class="text-danger">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            class="form-control font-monospace"
+                            id="srcConnStr"
+                            name="src_conn_str"
+                            placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=...;UID=sa;PWD=..."
+                            autocomplete="off"
+                            required
+                        />
+                        <div class="form-text text-muted">
+                            Connection string for the remote / source SQL Server (Server A).
+                        </div>
+                    </div>
+
+                    <!-- Destination (Local SQL Server) -->
+                    <div class="mb-0">
+                        <label for="dstConnStr" class="form-label">
+                            Local SQL Server (Destination) Connection String
+                            <span class="text-danger">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            class="form-control font-monospace"
+                            id="dstConnStr"
+                            name="dst_conn_str"
+                            placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost\SQLEXPRESS;UID=sa;PWD=..."
+                            autocomplete="off"
+                            required
+                        />
+                        <div class="form-text text-muted">
+                            Connection string for your local SQL Server (destination).
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- ── Database Names ── -->
+                <fieldset class="border rounded p-3 mb-4">
+                    <legend class="float-none w-auto px-2"
+                        style="font-size:.8rem;font-weight:700;color:#444;">
+                        Database Names
+                    </legend>
+
+                    <div class="row g-3">
+                        <!-- Source DB name -->
+                        <div class="col-sm-6">
+                            <label for="srcDbName" class="form-label">
+                                Source Database Name
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="srcDbName"
+                                name="src_db_name"
+                                placeholder="e.g. Production_DB"
+                                autocomplete="off"
+                                required
+                            />
+                            <div class="form-text text-muted">
+                                The database on Server A whose schema &amp; data will be copied.
+                            </div>
+                        </div>
+
+                        <!-- New local DB name -->
+                        <div class="col-sm-6">
+                            <label for="dstDbName" class="form-label">
+                                New Local Database Name
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="dstDbName"
+                                name="dst_db_name"
+                                placeholder="e.g. Production_DB_Local"
+                                autocomplete="off"
+                                required
+                            />
+                            <div class="form-text text-muted">
+                                This database will be created on your local SQL Server.
+                            </div>
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- ── Copy Options ── -->
+                <fieldset class="border rounded p-3 mb-4">
+                    <legend class="float-none w-auto px-2"
+                        style="font-size:.8rem;font-weight:700;color:#444;">
+                        Copy Options
+                    </legend>
+
+                    <!-- Rows per table -->
+                    <div class="mb-0" style="max-width:260px;">
+                        <label for="rowsPerTable" class="form-label">
+                            Number of rows to copy per table
+                        </label>
+                        <input
+                            type="number"
+                            class="form-control"
+                            id="rowsPerTable"
+                            name="rows_per_table"
+                            value="1000"
+                            min="1"
+                            max="1000000"
+                        />
+                        <div class="form-text text-muted">
+                            Use <code>0</code> to copy all rows (no limit).
+                        </div>
+                    </div>
+                </fieldset>
+
+                <!-- Save button -->
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="loadConfig()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Reload
+                    </button>
+                    <button type="submit" class="btn btn-success btn-sm px-4" id="saveConfigBtn">
+                        <i class="bi bi-floppy me-1"></i>Save Configuration
+                    </button>
+                </div>
+
+                <!-- Save result message (shown after submit) -->
+                <div id="configStatus" class="mt-3" style="display:none;"></div>
+
+            </form>
+        </div>
+        <!-- end TAB 2 -->
+
+    </div><!-- /tab-content -->
+</div><!-- /page-card -->
+
+
+<!-- ═══════════════════════════════════════════════
+     JavaScript
+═══════════════════════════════════════════════ -->
+<script>
+    // ── Helpers ──────────────────────────────────────────
+
+    /** Append a line to the log console with optional CSS class. */
+    function appendLog(text, cssClass = '') {
+        const box = document.getElementById('log-output');
+        const line = document.createElement('div');
+        if (cssClass) line.className = cssClass;
+        line.textContent = text;
+        box.appendChild(line);
+        box.scrollTop = box.scrollHeight;  // auto-scroll to bottom
+    }
+
+    /** Clear the log console. */
+    function clearLog() {
+        document.getElementById('log-output').innerHTML =
+            '<span class="log-info">// Log cleared.</span>';
+    }
+
+    /** Show or hide the status badge. */
+    function setStatus(text, badgeClass = 'bg-secondary') {
+        const badge = document.getElementById('statusBadge');
+        badge.textContent = text;
+        badge.className = `badge ${badgeClass}`;
+        badge.classList.remove('d-none');
+    }
+
+    /** Update the progress bar (0–100). */
+    function setProgress(pct, label = '') {
+        const wrapper = document.getElementById('progressWrapper');
+        const bar     = document.getElementById('progressBar');
+        const pctEl   = document.getElementById('progressPercent');
+        const lblEl   = document.getElementById('progressLabel');
+        wrapper.classList.remove('d-none');
+        bar.style.width       = pct + '%';
+        bar.setAttribute('aria-valuenow', pct);
+        pctEl.textContent     = pct + '%';
+        if (label) lblEl.textContent = label;
+    }
+
+    /** Show a status message below the config form. */
+    function showConfigMsg(msg, success = true) {
+        const el = document.getElementById('configStatus');
+        el.className = `alert ${success ? 'alert-success' : 'alert-danger'} py-2 px-3 mb-0`;
+        el.style.fontSize = '0.83rem';
+        el.textContent = msg;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 5000);
+    }
+
+
+    // ── Tab 1: Migration Control ─────────────────────────
+
+    /**
+     * Called when "Start Reproduction Process" is clicked.
+     * Sends a POST to /reproduce/start and polls /reproduce/status for log updates.
+     * Replace / extend this logic to match your actual Flask endpoints.
+     */
+    async function startReproduction() {
+        const btn = document.getElementById('startBtn');
+        btn.disabled = true;
+        clearLog();
+        setStatus('Running…', 'bg-warning text-dark');
+        setProgress(0, 'Initialising…');
+        appendLog('[INFO] Starting reproduction process…', 'log-info');
+
+        try {
+            const resp = await fetch('/reproduce/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(readConfig())
+            });
+            const result = await resp.json();
+
+            if (result.status === 'error') {
+                appendLog('[ERROR] ' + (result.message || 'Unknown error.'), 'log-error');
+                setStatus('Failed', 'bg-danger');
+                setProgress(0, 'Failed');
+                return;
+            }
+
+            // Poll for progress / streaming log updates
+            await pollProgress();
+
+        } catch (err) {
+            appendLog('[ERROR] Network error: ' + err.message, 'log-error');
+            setStatus('Error', 'bg-danger');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    /**
+     * Polls GET /reproduce/status every 1.5 s until the job is done.
+     * Expected JSON: { done: bool, progress: 0-100, label: str, logs: [str, ...] }
+     */
+    async function pollProgress() {
+        return new Promise((resolve) => {
+            const interval = setInterval(async () => {
+                try {
+                    const resp   = await fetch('/reproduce/status');
+                    const data   = await resp.json();
+
+                    (data.logs || []).forEach(line => {
+                        const cls = line.startsWith('[ERROR]')   ? 'log-error'
+                                  : line.startsWith('[WARN]')    ? 'log-warning'
+                                  : line.startsWith('[SUCCESS]') ? 'log-success'
+                                  : 'log-info';
+                        appendLog(line, cls);
+                    });
+
+                    setProgress(data.progress || 0, data.label || '');
+
+                    if (data.done) {
+                        clearInterval(interval);
+                        if (data.success) {
+                            appendLog('[SUCCESS] Reproduction completed successfully.', 'log-success');
+                            setStatus('Done', 'bg-success');
+                            setProgress(100, 'Complete');
+                        } else {
+                            appendLog('[ERROR] Process finished with errors.', 'log-error');
+                            setStatus('Failed', 'bg-danger');
+                        }
+                        resolve();
+                    }
+                } catch (err) {
+                    clearInterval(interval);
+                    appendLog('[ERROR] Status poll failed: ' + err.message, 'log-error');
+                    setStatus('Error', 'bg-danger');
+                    resolve();
+                }
+            }, 1500);
+        });
+    }
+
+
+    // ── Tab 2: Configuration ─────────────────────────────
+
+    /** Read config values from the form and return as a plain object. */
+    function readConfig() {
+        return {
+            src_conn_str:   document.getElementById('srcConnStr').value.trim(),
+            dst_conn_str:   document.getElementById('dstConnStr').value.trim(),
+            src_db_name:    document.getElementById('srcDbName').value.trim(),
+            dst_db_name:    document.getElementById('dstDbName').value.trim(),
+            rows_per_table: parseInt(document.getElementById('rowsPerTable').value, 10) || 1000,
+        };
+    }
+
+    /** Load saved configuration from GET /reproduce/config and populate form. */
+    async function loadConfig() {
+        try {
+            const resp   = await fetch('/reproduce/config');
+            const result = await resp.json();
+            if (result.status !== 'success') { return; }
+            const c = result.config || {};
+            document.getElementById('srcConnStr').value   = c.src_conn_str   || '';
+            document.getElementById('dstConnStr').value   = c.dst_conn_str   || '';
+            document.getElementById('srcDbName').value    = c.src_db_name    || '';
+            document.getElementById('dstDbName').value    = c.dst_db_name    || '';
+            document.getElementById('rowsPerTable').value = c.rows_per_table ?? 1000;
+        } catch (_) { /* ignore on initial load */ }
+    }
+
+    /** Handle "Save Configuration" form submit → POST /reproduce/config. */
+    async function saveConfig(event) {
+        event.preventDefault();
+        const btn = document.getElementById('saveConfigBtn');
+        btn.disabled = true;
+
+        try {
+            const resp   = await fetch('/reproduce/config', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(readConfig())
+            });
+            const result = await resp.json();
+            showConfigMsg(
+                result.message || (result.status === 'success' ? 'Saved.' : 'Error.'),
+                result.status === 'success'
+            );
+        } catch (err) {
+            showConfigMsg('Network error: ' + err.message, false);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // Auto-load saved config when the page opens
+    loadConfig();
+</script>
+
+<!-- Bootstrap 5 JS bundle (Popper included) -->
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    crossorigin="anonymous"
+></script>
+
+</body>
+</html>

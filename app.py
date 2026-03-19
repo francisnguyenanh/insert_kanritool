@@ -1,11 +1,15 @@
 import os
 import io
 import json
+import re
 import zipfile
 import tempfile
 import datetime
+import threading
 import pyodbc
 import pandas as pd
+from urllib.parse import quote_plus
+from sqlalchemy import create_engine, text
 from flask import Flask, render_template, request, jsonify, session, send_file
 import genScriptFromExcel
 
@@ -469,6 +473,85 @@ def save_excel_config():
         return jsonify({'status': 'error', 'message': f'Failed to save configuration: {e}'})
 
 
+import base64
+
+
+def validate_insert_columns(sql_content):
+    """Parse INSERT statements, compare columns against DB, return list of warning strings."""
+    import re
+
+    # Load skip_check_columns from genscript_config.json
+    skip_cols = set()
+    try:
+        config_path = os.path.join(get_script_dir(), 'genscript_config.json')
+        with open(config_path, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        skip_cols = {c.upper() for c in cfg.get('skip_check_columns', [])}
+    except Exception:
+        pass
+
+    # Collect unique set of columns per table from INSERT statements
+    table_cols = {}  # {table_name: set_of_columns}
+    pattern = re.compile(
+        r'INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)',
+        re.IGNORECASE
+    )
+    for m in pattern.finditer(sql_content):
+        tname = m.group(1).upper()
+        cols = {c.strip().upper() for c in m.group(2).split(',')}
+        if tname not in table_cols:
+            table_cols[tname] = cols
+        else:
+            table_cols[tname] |= cols  # union: accumulate all cols seen
+
+    if not table_cols:
+        return []
+
+    try:
+        conn = get_main_conn()
+    except Exception as e:
+        return [f'[DB connect failed — column check skipped] {e}']
+
+    warnings = []
+    try:
+        cursor = conn.cursor()
+        for tname, insert_cols in sorted(table_cols.items()):
+            try:
+                cursor.execute(
+                    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_NAME = ? ORDER BY ORDINAL_POSITION",
+                    tname
+                )
+                db_cols = {row[0].upper() for row in cursor.fetchall()} - skip_cols
+                if not db_cols:
+                    warnings.append(f"⚠️ Table {tname}: not found in DB (skipped).")
+                    continue
+                effective_insert = insert_cols - skip_cols
+                missing = sorted(db_cols - effective_insert)
+                extra   = sorted(effective_insert - db_cols)
+                if missing and extra:
+                    warnings.append(
+                        f"⚠️ Table {tname}: INSERT に欠けているカラム: {', '.join(missing)} / "
+                        f"余分なカラム: {', '.join(extra)}"
+                    )
+                elif missing:
+                    warnings.append(
+                        f"⚠️ Table {tname}: INSERT に欠けているカラム: {', '.join(missing)}"
+                    )
+                elif extra:
+                    warnings.append(
+                        f"⚠️ Table {tname}: INSERT にテーブル内にないカラム: {', '.join(extra)}"
+                    )
+                else:
+                    warnings.append(f"✅ Table {tname}: OK (全カラム一致)")
+            except Exception as e:
+                warnings.append(f"⚠️ Table {tname}: check failed — {e}")
+    finally:
+        conn.close()
+
+    return warnings
+
+
 @app.route('/gen_excel', methods=['POST'])
 def gen_excel():
     if 'excel_file' not in request.files:
@@ -513,9 +596,15 @@ def gen_excel():
         with open(tmp_output.name, 'r', encoding='utf-8') as f:
             sql_content = f.read()
 
-        sql_bytes = io.BytesIO(sql_content.encode('utf-8'))
-        sql_bytes.seek(0)
-        return send_file(sql_bytes, as_attachment=True, download_name='insert_all.sql', mimetype='text/plain')
+        # Validate columns against DB
+        warnings = validate_insert_columns(sql_content)
+
+        sql_b64 = base64.b64encode(sql_content.encode('utf-8')).decode('ascii')
+        return jsonify({
+            'status': 'success',
+            'sql_b64': sql_b64,
+            'warnings': warnings,
+        })
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'An error occurred: {str(e)}'})
     finally:
@@ -524,6 +613,297 @@ def gen_excel():
                 os.unlink(path)
             except OSError:
                 pass
+
+
+# ─────────────────────────────────────────────────────────────
+#  Reproduce DB — config helpers
+# ─────────────────────────────────────────────────────────────
+
+_REPRODUCE_CONFIG_FILE = 'reproduce_config.json'
+_REPRODUCE_CONFIG_DEFAULTS = {
+    'src_conn_str':   '',
+    'dst_conn_str':   '',
+    'src_db_name':    '',
+    'dst_db_name':    '',
+    'rows_per_table': 1000,
+}
+
+
+def _get_reproduce_config():
+    path = os.path.join(get_script_dir(), _REPRODUCE_CONFIG_FILE)
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {**_REPRODUCE_CONFIG_DEFAULTS, **data}
+    except Exception:
+        return dict(_REPRODUCE_CONFIG_DEFAULTS)
+
+
+def _save_reproduce_config(data):
+    path = os.path.join(get_script_dir(), _REPRODUCE_CONFIG_FILE)
+    cfg = {k: data.get(k, v) for k, v in _REPRODUCE_CONFIG_DEFAULTS.items()}
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    return cfg
+
+
+# ─────────────────────────────────────────────────────────────
+#  Reproduce DB — background migration job state
+# ─────────────────────────────────────────────────────────────
+
+_migration_lock = threading.Lock()
+_migration_state = {
+    'running':  False,
+    'done':     False,
+    'success':  False,
+    'progress': 0,
+    'label':    '',
+    'logs':     [],
+}
+
+
+def _run_migration(cfg):
+    """Background thread: copies tables from a remote SQL Server to a new local DB."""
+    global _migration_state
+
+    def log(msg, level='INFO'):
+        prefix = {
+            'INFO':    '[INFO]',
+            'ERROR':   '[ERROR]',
+            'WARN':    '[WARN]',
+            'SUCCESS': '[SUCCESS]',
+        }.get(level, '[INFO]')
+        with _migration_lock:
+            _migration_state['logs'].append(f"{prefix} {msg}")
+
+    def set_progress(pct, label=''):
+        with _migration_lock:
+            _migration_state['progress'] = pct
+            if label:
+                _migration_state['label'] = label
+
+    def finish(success):
+        with _migration_lock:
+            _migration_state['done']    = True
+            _migration_state['running'] = False
+            _migration_state['success'] = success
+
+    try:
+        src_conn_str = (cfg.get('src_conn_str') or '').strip()
+        dst_conn_str = (cfg.get('dst_conn_str') or '').strip()
+        src_db_name  = (cfg.get('src_db_name')  or '').strip()
+        dst_db_name  = (cfg.get('dst_db_name')  or '').strip()
+        rows         = int(cfg.get('rows_per_table') or 1000)
+
+        if not src_conn_str or not dst_conn_str or not src_db_name or not dst_db_name:
+            log('Missing required configuration (connection strings or DB names).', 'ERROR')
+            finish(False)
+            return
+
+        # Validate destination DB name to prevent injection in CREATE DATABASE
+        if not re.match(r'^[A-Za-z0-9_\-]+$', dst_db_name):
+            log(
+                f"Invalid destination DB name '{dst_db_name}'. "
+                "Use letters, digits, underscores, or hyphens only.", 'ERROR'
+            )
+            finish(False)
+            return
+
+        # ── Step 1: Create destination DB if not exists ──
+        log(f"Connecting to destination server to create database '{dst_db_name}'…")
+        set_progress(2, 'Creating destination database…')
+        try:
+            conn_master = pyodbc.connect(dst_conn_str, autocommit=True)
+            cur = conn_master.cursor()
+            cur.execute("SELECT COUNT(*) FROM sys.databases WHERE name = ?", dst_db_name)
+            if cur.fetchone()[0] == 0:
+                cur.execute(f"CREATE DATABASE [{dst_db_name}]")
+                log(f"Database '{dst_db_name}' created.", 'SUCCESS')
+            else:
+                log(f"Database '{dst_db_name}' already exists — skipping creation.")
+            conn_master.close()
+        except Exception as e:
+            log(f"Failed to create destination database: {e}", 'ERROR')
+            finish(False)
+            return
+
+        # ── Step 2: Connect to source DB and fetch table list ──
+        log(f"Connecting to source database '{src_db_name}'…")
+        set_progress(5, 'Fetching table list…')
+        try:
+            upper = src_conn_str.upper()
+            if 'DATABASE=' not in upper and 'INITIAL CATALOG=' not in upper:
+                src_full = src_conn_str + f";DATABASE={src_db_name}"
+            else:
+                src_full = src_conn_str
+            source_conn = pyodbc.connect(src_full)
+            tables_df = pd.read_sql(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME",
+                source_conn
+            )
+            table_list = tables_df['TABLE_NAME'].tolist()
+            log(f"Found {len(table_list)} table(s) to copy.")
+        except Exception as e:
+            log(f"Failed to connect to source database: {e}", 'ERROR')
+            finish(False)
+            return
+
+        # ── Step 3: Build SQLAlchemy engine for destination ──
+        try:
+            dst_full = dst_conn_str + f";DATABASE={dst_db_name}"
+            dest_engine = create_engine(
+                f"mssql+pyodbc:///?odbc_connect={quote_plus(dst_full)}",
+                fast_executemany=True,
+            )
+        except Exception as e:
+            log(f"Failed to create destination engine: {e}", 'ERROR')
+            source_conn.close()
+            finish(False)
+            return
+
+        # ── Step 4: Copy each table ──
+        total         = len(table_list)
+        success_count = 0
+        error_count   = 0
+
+        for i, table in enumerate(table_list):
+            pct = 5 + int((i / total) * 90) if total else 95
+            set_progress(pct, f"Đang copy bảng {i + 1}/{total}: {table}…")
+            log(f"({i + 1}/{total}) Đang copy bảng [{table}]…")
+            try:
+                if rows > 0:
+                    query = f"SELECT TOP {rows} * FROM [{table}] ORDER BY 1 DESC"
+                else:
+                    query = f"SELECT * FROM [{table}]"
+                df = pd.read_sql(query, source_conn)
+                row_count = len(df)
+
+                # Use a single SQLAlchemy connection per table so that
+                # SET IDENTITY_INSERT stays in scope during the actual INSERT.
+                with dest_engine.begin() as dest_conn:
+                    # ── IDENTITY INSERT ───────────────────────────────────────
+                    # Attempt to preserve original ID values from the source.
+                    # When if_exists='replace' recreates the table from the
+                    # DataFrame schema (no IDENTITY column), this statement will
+                    # raise an error and be silently skipped — the values are
+                    # still written correctly because the new column is a plain
+                    # integer without the IDENTITY constraint.
+                    identity_enabled = False
+                    try:
+                        dest_conn.execute(text(f"SET IDENTITY_INSERT [{table}] ON"))
+                        identity_enabled = True
+                    except Exception:
+                        pass  # table has no identity column — insert proceeds normally
+
+                    try:
+                        # method='multi' → multi-row INSERT VALUES (bulk insert).
+                        # chunksize=1000 keeps each statement within SQL Server
+                        # parameter limits (~2100 params per batch).
+                        df.to_sql(
+                            table, dest_conn,
+                            if_exists='replace',
+                            index=False,
+                            method='multi',
+                            chunksize=1000,
+                        )
+                    finally:
+                        # Always turn IDENTITY INSERT back off after the write.
+                        if identity_enabled:
+                            try:
+                                dest_conn.execute(text(f"SET IDENTITY_INSERT [{table}] OFF"))
+                            except Exception:
+                                pass
+
+                log(f"Đang copy bảng [{table}]… Thành công ({row_count} dòng)", 'SUCCESS')
+                success_count += 1
+            except Exception as e:
+                log(f"Bảng [{table}] thất bại: {e}", 'ERROR')
+                error_count += 1
+
+        source_conn.close()
+        dest_engine.dispose()
+        set_progress(100, 'Done')
+
+        if error_count == 0:
+            log(f"Migration complete! {success_count} table(s) copied successfully.", 'SUCCESS')
+        else:
+            log(f"Migration finished with errors. OK: {success_count} / Failed: {error_count}.", 'WARN')
+        finish(error_count == 0)
+
+    except Exception as exc:
+        with _migration_lock:
+            _migration_state['logs'].append(f'[ERROR] Unexpected error: {exc}')
+        finish(False)
+
+
+# ─────────────────────────────────────────────────────────────
+#  Reproduce DB — Routes
+# ─────────────────────────────────────────────────────────────
+
+@app.route('/reproduce-db')
+def reproduce_db_page():
+    return render_template('reproduce_db.html')
+
+
+@app.route('/reproduce/config', methods=['GET', 'POST'])
+def reproduce_config():
+    if request.method == 'GET':
+        return jsonify({'status': 'success', 'config': _get_reproduce_config()})
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No data provided.'})
+    try:
+        _save_reproduce_config(data)
+        return jsonify({'status': 'success', 'message': 'Configuration saved successfully.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Failed to save configuration: {e}'})
+
+
+@app.route('/reproduce/start', methods=['POST'])
+def reproduce_start():
+    global _migration_state
+
+    with _migration_lock:
+        if _migration_state.get('running'):
+            return jsonify({'status': 'error', 'message': 'A migration is already in progress.'})
+        _migration_state = {
+            'running':  True,
+            'done':     False,
+            'success':  False,
+            'progress': 0,
+            'label':    'Starting…',
+            'logs':     [],
+        }
+
+    # Merge posted values on top of saved config so UI changes take effect immediately
+    posted = request.get_json() or {}
+    cfg = _get_reproduce_config()
+    for k in _REPRODUCE_CONFIG_DEFAULTS:
+        if posted.get(k) not in (None, ''):
+            cfg[k] = posted[k]
+
+    threading.Thread(target=_run_migration, args=(cfg,), daemon=True).start()
+    return jsonify({'status': 'success', 'message': 'Migration started.'})
+
+
+@app.route('/reproduce/status', methods=['GET'])
+def reproduce_status():
+    with _migration_lock:
+        done     = _migration_state['done']
+        success  = _migration_state['success']
+        progress = _migration_state['progress']
+        label    = _migration_state['label']
+        logs     = list(_migration_state['logs'])
+        _migration_state['logs'] = []   # clear: each poll returns only new lines
+    return jsonify({
+        'done':     done,
+        'success':  success,
+        'progress': progress,
+        'label':    label,
+        'logs':     logs,
+    })
 
 
 if __name__ == '__main__':
