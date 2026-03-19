@@ -749,18 +749,40 @@ def _run_migration(cfg):
             finish(False)
             return
 
-        # ── Step 3: Build SQLAlchemy engine for destination ──
+        # ── Step 3: Open a raw pyodbc connection to the destination DB ──
+        # (Avoids SQLAlchemy's has_table() which generates CAST(? AS NVARCHAR(max))
+        #  — incompatible with the legacy [Microsoft][ODBC SQL Server Driver] → HY104)
         try:
             dst_full = dst_conn_str + f";DATABASE={dst_db_name}"
-            dest_engine = create_engine(
-                f"mssql+pyodbc:///?odbc_connect={quote_plus(dst_full)}",
-                fast_executemany=True,
-            )
+            dest_raw = pyodbc.connect(dst_full, autocommit=False)
         except Exception as e:
-            log(f"Failed to create destination engine: {e}", 'ERROR')
+            log(f"Failed to connect to destination database: {e}", 'ERROR')
             source_conn.close()
             finish(False)
             return
+
+        # ── Helpers for raw-pyodbc writes ────────────────────────────────────
+
+        def _pandas_dtype_to_sql(dtype):
+            """Map a pandas dtype to a SQL Server column type string."""
+            from pandas.api.types import (
+                is_bool_dtype, is_integer_dtype,
+                is_float_dtype, is_datetime64_any_dtype,
+            )
+            if is_bool_dtype(dtype):             return "BIT"
+            if is_integer_dtype(dtype):          return "BIGINT"
+            if is_float_dtype(dtype):            return "FLOAT"
+            if is_datetime64_any_dtype(dtype):   return "DATETIME2"
+            return "NVARCHAR(MAX)"
+
+        def _safe_val(v):
+            """Convert NaN / NaT / None to None; leave everything else intact."""
+            if v is None:
+                return None
+            try:
+                return None if pd.isnull(v) else v
+            except (TypeError, ValueError):
+                return v
 
         # ── Step 4: Copy each table ──
         total         = len(table_list)
@@ -779,50 +801,49 @@ def _run_migration(cfg):
                 df = pd.read_sql(query, source_conn)
                 row_count = len(df)
 
-                # Use a single SQLAlchemy connection per table so that
-                # SET IDENTITY_INSERT stays in scope during the actual INSERT.
-                with dest_engine.begin() as dest_conn:
-                    # ── IDENTITY INSERT ───────────────────────────────────────
-                    # Attempt to preserve original ID values from the source.
-                    # When if_exists='replace' recreates the table from the
-                    # DataFrame schema (no IDENTITY column), this statement will
-                    # raise an error and be silently skipped — the values are
-                    # still written correctly because the new column is a plain
-                    # integer without the IDENTITY constraint.
-                    identity_enabled = False
-                    try:
-                        dest_conn.execute(text(f"SET IDENTITY_INSERT [{table}] ON"))
-                        identity_enabled = True
-                    except Exception:
-                        pass  # table has no identity column — insert proceeds normally
+                cur = dest_raw.cursor()
 
-                    try:
-                        # method='multi' → multi-row INSERT VALUES (bulk insert).
-                        # chunksize=1000 keeps each statement within SQL Server
-                        # parameter limits (~2100 params per batch).
-                        df.to_sql(
-                            table, dest_conn,
-                            if_exists='replace',
-                            index=False,
-                            method='multi',
-                            chunksize=1000,
-                        )
-                    finally:
-                        # Always turn IDENTITY INSERT back off after the write.
-                        if identity_enabled:
-                            try:
-                                dest_conn.execute(text(f"SET IDENTITY_INSERT [{table}] OFF"))
-                            except Exception:
-                                pass
+                # Drop existing table — uses an identifier in the SQL text
+                # (no driver-parameter binding) to avoid the HY104 issue.
+                cur.execute(
+                    f"IF OBJECT_ID(N'[{table}]', N'U') IS NOT NULL "
+                    f"DROP TABLE [{table}]"
+                )
 
+                # Build CREATE TABLE from DataFrame dtypes
+                col_defs = ", ".join(
+                    f"[{col}] {_pandas_dtype_to_sql(dtype)} NULL"
+                    for col, dtype in df.dtypes.items()
+                )
+                cur.execute(f"CREATE TABLE [{table}] ({col_defs})")
+
+                if row_count > 0:
+                    col_names   = ", ".join(f"[{c}]" for c in df.columns)
+                    placeholders = ", ".join("?" for _ in df.columns)
+                    insert_sql  = (
+                        f"INSERT INTO [{table}] ({col_names}) "
+                        f"VALUES ({placeholders})"
+                    )
+                    # Convert NA → None for pyodbc compatibility
+                    data_rows = [
+                        tuple(_safe_val(v) for v in row)
+                        for row in df.itertuples(index=False, name=None)
+                    ]
+                    # Insert in chunks of 500 rows to stay within driver limits
+                    chunk = 500
+                    for start in range(0, row_count, chunk):
+                        cur.executemany(insert_sql, data_rows[start:start + chunk])
+
+                dest_raw.commit()
                 log(f"Đang copy bảng [{table}]… Thành công ({row_count} dòng)", 'SUCCESS')
                 success_count += 1
             except Exception as e:
+                dest_raw.rollback()
                 log(f"Bảng [{table}] thất bại: {e}", 'ERROR')
                 error_count += 1
 
         source_conn.close()
-        dest_engine.dispose()
+        dest_raw.close()
         set_progress(100, 'Done')
 
         if error_count == 0:
