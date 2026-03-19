@@ -363,23 +363,23 @@
 ══════════════════════════════════════════════ -->
 <nav class="sidebar">
     <div class="sidebar-brand">
-        &#x1F5C4; DB Tool Suite
-        <small>Database Utilities</small>
+        &#x1F5C4; Bộ công cụ DB
+        <small>Các tiện ích cơ sở dữ liệu</small>
     </div>
     <ul class="sidebar-menu">
         <li>
             <a class="active" onclick="switchPage('page-export')">
-                <span class="menu-icon">&#x1F4E4;</span>Gen Script SQL from OLD to NEW
+                <span class="menu-icon">&#x1F4E4;</span>Tạo script SQL từ DB cũ sang DB mới
             </a>
         </li>
         <li>
             <a onclick="switchPage('page-excel')">
-                <span class="menu-icon">&#x1F4C8;</span>Gen Script SQL from 設計書
+                <span class="menu-icon">&#x1F4C8;</span>Tạo script SQL từ thiết kế (Excel)
             </a>
         </li>
         <li>
             <a onclick="switchPage('page-repro')">
-                <span class="menu-icon">&#x1F504;</span>Get a copy of remote DB
+                <span class="menu-icon">&#x1F504;</span>Sao chép DB từ xa về máy
             </a>
         </li>
     </ul>
@@ -396,52 +396,52 @@
     <div id="page-export" class="page-panel active">
         <div class="card">
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchInnerTab('export', 'export-proc')">&#x1F4E4; 処理</button>
-                <button class="tab-btn"        onclick="switchInnerTab('export', 'export-cfg')">&#x2699; Config</button>
+                <button class="tab-btn active" onclick="switchInnerTab('export', 'export-proc')">&#x1F4E4; Xử lý</button>
+                <button class="tab-btn"        onclick="switchInnerTab('export', 'export-cfg')">&#x2699; Cấu hình</button>
             </div>
 
-            <!-- Processing tab -->
+            <!-- Tab xử lý -->
             <div id="export-proc" class="tab-panel active">
-                <h2>DB Export Tool</h2>
+                <h2>Công cụ xuất DB</h2>
                 <fieldset>
                     <div class="form-row">
-                        <label for="oldSystemId">Old System ID:</label>
+                        <label for="oldSystemId">System ID cũ:</label>
                         <input type="text" id="oldSystemId" oninput="checkExportInputs()" autocomplete="off" />
                     </div>
                     <div class="form-row">
-                        <label for="newSystemId">New System ID:</label>
+                        <label for="newSystemId">System ID mới:</label>
                         <input type="text" id="newSystemId" oninput="checkExportInputs()" autocomplete="off" />
                     </div>
                     <div class="form-row">
-                        <label for="currentMaxFileId">Current Max File ID:</label>
+                        <label for="currentMaxFileId">Max File ID hiện tại:</label>
                         <input type="text" id="currentMaxFileId" disabled autocomplete="off" />
                     </div>
-                    <p class="table-section-label">Tables with matching System ID</p>
+                    <p class="table-section-label">Các bảng có System ID khớp</p>
                     <textarea id="tableList" readonly></textarea>
                 </fieldset>
                 <div class="btn-row">
-                    <button id="connectBtn" onclick="connectToDb()" disabled>Connect to Database</button>
+                    <button id="connectBtn" onclick="connectToDb()" disabled>Kết nối Database</button>
                 </div>
                 <div class="btn-row">
-                    <button id="exportMultiBtn" onclick="exportData('multi')" disabled>Export Data multi files (.zip)</button>
+                    <button id="exportMultiBtn" onclick="exportData('multi')" disabled>Xuất dữ liệu nhiều file (.zip)</button>
                 </div>
                 <div class="btn-row">
-                    <button id="exportSingleBtn" onclick="exportData('single')" disabled>Export Data single file (.sql)</button>
+                    <button id="exportSingleBtn" onclick="exportData('single')" disabled>Xuất dữ liệu 1 file (.sql)</button>
                 </div>
                 <div id="exportStatus" class="status-msg"></div>
             </div>
 
-            <!-- Config tab -->
+            <!-- Tab cấu hình -->
             <div id="export-cfg" class="tab-panel">
-                <h2>DB Export Config</h2>
+                <h2>Cấu hình xuất DB</h2>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Connection Strings</legend>
+                    <legend style="font-size:12px;color:#555;padding:0 4px;">Chuỗi kết nối</legend>
                     <div style="margin-bottom:10px;">
-                        <p class="table-section-label" style="margin-bottom:4px;">data_string.txt (Main DB)</p>
+                        <p class="table-section-label" style="margin-bottom:4px;">data_string.txt (DB chính)</p>
                         <input type="text" id="cfgDataString" style="width:100%;" autocomplete="off" />
                     </div>
                     <div style="margin-bottom:10px;">
-                        <p class="table-section-label" style="margin-bottom:4px;">file_string.txt (File DB)</p>
+                        <p class="table-section-label" style="margin-bottom:4px;">file_string.txt (DB file)</p>
                         <input type="text" id="cfgFileString" style="width:100%;" autocomplete="off" />
                     </div>
                     <div>
@@ -450,7 +450,7 @@
                     </div>
                 </fieldset>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Table Lists</legend>
+                    <legend style="font-size:12px;color:#555;padding:0 4px;">Danh sách bảng</legend>
                     <div style="margin-bottom:10px;">
                         <p class="table-section-label" style="margin-bottom:4px;">table.txt</p>
                         <textarea id="cfgTable" style="height:110px;"></textarea>
@@ -461,7 +461,7 @@
                     </div>
                 </fieldset>
                 <div class="btn-row">
-                    <button id="saveConfigBtn" onclick="saveConfig()">Save Config</button>
+                    <button id="saveConfigBtn" onclick="saveConfig()">Lưu cấu hình</button>
                 </div>
                 <div id="configStatus" class="status-msg"></div>
             </div>
@@ -474,31 +474,31 @@
     <div id="page-excel" class="page-panel">
         <div class="card">
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchInnerTab('excel', 'excel-proc')">&#x1F4C8; 処理</button>
-                <button class="tab-btn"        onclick="switchInnerTab('excel', 'excel-cfg')">&#x2699; Config</button>
+                <button class="tab-btn active" onclick="switchInnerTab('excel', 'excel-proc')">&#x1F4C8; Xử lý</button>
+                <button class="tab-btn"        onclick="switchInnerTab('excel', 'excel-cfg')">&#x2699; Cấu hình</button>
             </div>
 
-            <!-- Processing tab -->
+            <!-- Tab xử lý -->
             <div id="excel-proc" class="tab-panel active">
-                <h2>Gen Script from Excel</h2>
+                <h2>Tạo script từ Excel</h2>
                 <fieldset>
                     <div class="form-row">
-                        <label for="excelFile">Excel File (.xlsx):</label>
+                        <label for="excelFile">File Excel (.xlsx):</label>
                         <input type="file" id="excelFile" accept=".xlsx" />
                     </div>
                     <div class="form-row">
                         <label for="genSystemId">System ID:</label>
-                        <input type="text" id="genSystemId" placeholder="(optional)" autocomplete="off" />
+                        <input type="text" id="genSystemId" placeholder="(không bắt buộc)" autocomplete="off" />
                     </div>
-                    <p class="hint" style="margin-left:173px;">省略時は現在時刻 (HHMMSS) を使用</p>
+                    <p class="hint" style="margin-left:173px;">Nếu bỏ trống sẽ dùng thời gian hiện tại (HHMMSS)</p>
                     <div class="form-row">
-                        <label for="genSystemDate">System Date:</label>
+                        <label for="genSystemDate">Ngày System:</label>
                         <input type="date" id="genSystemDate" />
                     </div>
-                    <p class="hint" style="margin-left:173px;">省略時は本日の日付を使用</p>
+                    <p class="hint" style="margin-left:173px;">Nếu bỏ trống sẽ dùng ngày hôm nay</p>
                 </fieldset>
                 <div class="btn-row">
-                    <button id="genBtn" onclick="genFromExcel()">Generate insert_all.sql</button>
+                    <button id="genBtn" onclick="genFromExcel()">Tạo insert_all.sql</button>
                 </div>
                 <div id="excelStatus" class="status-msg"></div>
                 <div id="colWarnings" style="display:none;margin-top:10px;font-size:12px;
@@ -506,30 +506,30 @@
                      background:#fffef0;max-height:260px;overflow-y:auto;"></div>
             </div>
 
-            <!-- Config tab -->
+            <!-- Tab cấu hình -->
             <div id="excel-cfg" class="tab-panel">
-                <h2>Gen Script Config</h2>
+                <h2>Cấu hình tạo script</h2>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">User Settings (usernameID.txt)</legend>
+                    <legend style="font-size:12px;color:#555;padding:0 4px;">Thiết lập người dùng (usernameID.txt)</legend>
                     <div class="form-row">
                         <label for="cfgUsernameId">Username ID:</label>
                         <input type="text" id="cfgUsernameId" autocomplete="off" />
                     </div>
                 </fieldset>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Sheet Filter</legend>
-                    <p class="table-section-label" style="margin-bottom:4px;">Excluded Sheet Names (one per line)</p>
+                    <legend style="font-size:12px;color:#555;padding:0 4px;">Lọc sheet</legend>
+                    <p class="table-section-label" style="margin-bottom:4px;">Tên sheet loại trừ (mỗi dòng 1 sheet)</p>
                     <textarea id="cfgExcludedSheets" style="height:80px;"></textarea>
-                    <p class="table-section-label" style="margin-bottom:4px;">Stop Values (one per line)</p>
+                    <p class="table-section-label" style="margin-bottom:4px;">Giá trị dừng (mỗi dòng 1 giá trị)</p>
                     <textarea id="cfgStopValues" style="height:100px;"></textarea>
                 </fieldset>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Column Check — Skip List</legend>
-                    <p class="hint" style="margin-bottom:6px;margin-top:0;">Column names excluded from INSERT vs DB column check. One per line, case-insensitive.</p>
+                    <legend style="font-size:12px;color:#555;padding:0 4px;">Kiểm tra cột — Danh sách bỏ qua</legend>
+                    <p class="hint" style="margin-bottom:6px;margin-top:0;">Tên cột loại trừ khi kiểm tra INSERT vs DB. Mỗi dòng 1 tên, không phân biệt hoa thường.</p>
                     <textarea id="cfgSkipCheckColumns" style="height:100px;"></textarea>
                 </fieldset>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Type Mappings (JSON)</legend>
+                    <legend style="font-size:12px;color:#555;padding:0 4px;">Ánh xạ kiểu dữ liệu (JSON)</legend>
                     <p class="table-section-label" style="margin-bottom:4px;">Mapping Value Dict</p>
                     <textarea id="cfgMappingValueDict" style="height:100px;font-family:monospace;"></textarea>
                     <p class="table-section-label" style="margin-bottom:4px;">Koumoku Type Mapping</p>
@@ -542,7 +542,7 @@
                     <textarea id="cfgTableInfo" style="height:180px;font-family:monospace;font-size:11px;"></textarea>
                 </fieldset>
                 <div class="btn-row">
-                    <button id="saveExcelConfigBtn" onclick="saveExcelConfig()">Save Gen Script Config</button>
+                    <button id="saveExcelConfigBtn" onclick="saveExcelConfig()">Lưu cấu hình tạo script</button>
                 </div>
                 <div id="excelConfigStatus" class="status-msg"></div>
             </div>
@@ -555,12 +555,12 @@
     <div id="page-repro" class="page-panel">
         <div class="card wide">
             <div class="repro-header">
-                <h1>&#x1F504; DB Reproducer</h1>
-                <p>Clone a remote SQL Server database to your local environment for development &amp; testing.</p>
+                <h1>&#x1F504; Công cụ sao chép DB</h1>
+                <p>Sao chép database SQL Server từ xa về máy để phát triển & kiểm thử.</p>
             </div>
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchInnerTab('repro', 'repro-proc')">&#x25B6; Migration Control</button>
-                <button class="tab-btn"        onclick="switchInnerTab('repro', 'repro-cfg')">&#x2699; Configuration</button>
+                <button class="tab-btn active" onclick="switchInnerTab('repro', 'repro-proc')">&#x25B6; Điều khiển Migration</button>
+                <button class="tab-btn"        onclick="switchInnerTab('repro', 'repro-cfg')">&#x2699; Cấu hình</button>
             </div>
 
             <!-- Migration Control tab -->
@@ -634,35 +634,35 @@
 
                     <div class="repro-fieldset">
                         <fieldset style="border:none;padding:0;margin:0;">
-                            <legend>Connection Strings</legend>
+                            <legend>Chuỗi kết nối</legend>
                             <div class="repro-row">
-                                <label class="repro-label">SQL Server A (Source) <span style="color:red;">*</span></label>
+                                <label class="repro-label">SQL Server A (Nguồn) <span style="color:red;">*</span></label>
                                 <input type="text" class="repro-input" id="srcConnStr" autocomplete="off"
                                     placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=...;UID=sa;PWD=..." />
-                                <div class="repro-hint">Connection string for the remote / source SQL Server (Server A).</div>
+                                <div class="repro-hint">Chuỗi kết nối đến SQL Server nguồn (Server A).</div>
                             </div>
                             <div class="repro-row">
-                                <label class="repro-label">Local SQL Server (Destination) <span style="color:red;">*</span></label>
+                                <label class="repro-label">SQL Server cục bộ (Đích) <span style="color:red;">*</span></label>
                                 <input type="text" class="repro-input" id="dstConnStr" autocomplete="off"
                                     placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost\SQLEXPRESS;UID=sa;PWD=..." />
-                                <div class="repro-hint">Connection string for your local SQL Server (destination).</div>
+                                <div class="repro-hint">Chuỗi kết nối đến SQL Server cục bộ (máy bạn).</div>
                             </div>
                         </fieldset>
                     </div>
 
                     <div class="repro-fieldset">
                         <fieldset style="border:none;padding:0;margin:0;">
-                            <legend>Database Names</legend>
+                            <legend>Tên database</legend>
                             <div style="display:flex;gap:16px;">
                                 <div style="flex:1;" class="repro-row">
-                                    <label class="repro-label">Source Database <span style="color:red;">*</span></label>
-                                    <input type="text" class="repro-input" id="srcDbName" autocomplete="off" placeholder="e.g. Production_DB" />
-                                    <div class="repro-hint">The database on Server A whose data will be copied.</div>
+                                    <label class="repro-label">Database nguồn <span style="color:red;">*</span></label>
+                                    <input type="text" class="repro-input" id="srcDbName" autocomplete="off" placeholder="VD: Production_DB" />
+                                    <div class="repro-hint">Database trên Server A sẽ được sao chép dữ liệu.</div>
                                 </div>
                                 <div style="flex:1;" class="repro-row">
-                                    <label class="repro-label">New Local Database <span style="color:red;">*</span></label>
-                                    <input type="text" class="repro-input" id="dstDbName" autocomplete="off" placeholder="e.g. Production_DB_Local" />
-                                    <div class="repro-hint">Will be created on your local SQL Server.</div>
+                                    <label class="repro-label">Database cục bộ mới <span style="color:red;">*</span></label>
+                                    <input type="text" class="repro-input" id="dstDbName" autocomplete="off" placeholder="VD: Production_DB_Local" />
+                                    <div class="repro-hint">Sẽ được tạo trên SQL Server cục bộ của bạn.</div>
                                 </div>
                             </div>
                         </fieldset>
@@ -670,18 +670,18 @@
 
                     <div class="repro-fieldset">
                         <fieldset style="border:none;padding:0;margin:0;">
-                            <legend>Copy Options</legend>
+                            <legend>Tùy chọn sao chép</legend>
                             <div style="max-width:260px;" class="repro-row">
-                                <label class="repro-label">Rows to copy per table</label>
+                                <label class="repro-label">Số dòng sao chép mỗi bảng</label>
                                 <input type="number" class="repro-input" id="rowsPerTable" value="1000" min="1" max="1000000" />
-                                <div class="repro-hint">Use 0 to copy all rows (no limit).</div>
+                                <div class="repro-hint">Nhập 0 để sao chép toàn bộ (không giới hạn).</div>
                             </div>
                         </fieldset>
                     </div>
 
                     <div class="repro-btn-row">
-                        <button type="button" class="repro-reload-btn" onclick="loadReproConfig()">&#x21BA; Reload</button>
-                        <button type="submit" class="repro-save-btn" id="saveReproConfigBtn">&#x1F4BE; Save Configuration</button>
+                        <button type="button" class="repro-reload-btn" onclick="loadReproConfig()">&#x21BA; Tải lại</button>
+                        <button type="submit" class="repro-save-btn" id="saveReproConfigBtn">&#x1F4BE; Lưu cấu hình</button>
                     </div>
                     <div id="reproConfigStatus" class="repro-alert"></div>
 
