@@ -1,7 +1,13 @@
 import os
+import io
+import json
+import zipfile
+import tempfile
+import datetime
 import pyodbc
 import pandas as pd
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_file
+import genScriptFromExcel
 
 app = Flask(__name__)
 app.secret_key = 'db_export_tool_secret_key_flask'
@@ -25,12 +31,12 @@ def get_file_conn():
     return pyodbc.connect(conn_str)
 
 
-def export_data_file_helper(conn_file, lst_fileid, original_max_file_id, save_directory):
-    """Exports T_FILE_DATA and S_NUMBER_FILE – mirrors export_data_file() in main.py."""
+def export_data_file_helper(conn_file, lst_fileid, original_max_file_id):
+    """Exports T_FILE_DATA and S_NUMBER_FILE – returns content as string."""
     file_id_keys = list(lst_fileid.keys())
     query = f"SELECT * FROM T_FILE_DATA WHERE FILE_ID IN ({', '.join(['?' for _ in file_id_keys])})"
     df = pd.read_sql(query, conn_file, params=file_id_keys)
-
+    result = []
     if not df.empty:
         current_max_file_id = original_max_file_id
         insert_queries = []
@@ -61,12 +67,7 @@ def export_data_file_helper(conn_file, lst_fileid, original_max_file_id, save_di
             insert_queries.append(
                 f"INSERT INTO T_FILE_DATA ({', '.join(columns)}) VALUES ({', '.join(values)});"
             )
-
-        file_path = os.path.join(save_directory, 'T_FILE_DATA.sql')
-        with open(file_path, 'w', encoding='utf-8') as f:
-            for q in insert_queries:
-                f.write(q + '\n')
-
+        result.extend(insert_queries)
         # S_NUMBER_FILE
         df2 = pd.read_sql("SELECT * FROM S_NUMBER_FILE", conn_file)
         set_clause = []
@@ -85,10 +86,8 @@ def export_data_file_helper(conn_file, lst_fileid, original_max_file_id, save_di
                 set_clause.append(f"{col} = '{value.strftime('%Y-%m-%d %H:%M:%S')}'")
             else:
                 set_clause.append(f"{col} = {repr(value)}")
-
-        file_path = os.path.join(save_directory, 'S_NUMBER_FILE.sql')
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(f"UPDATE S_NUMBER_FILE SET {', '.join(set_clause)};\n")
+        result.append(f"UPDATE S_NUMBER_FILE SET {', '.join(set_clause)};")
+    return '\n'.join(result)
 
 
 @app.route('/')
@@ -143,7 +142,6 @@ def export_data_multi():
     data = request.get_json()
     old_system_id = (data.get('old_system_id') or '').strip()
     new_system_id = (data.get('new_system_id') or '').strip()
-    save_directory = (data.get('save_directory') or '').strip()
     current_max_file_id_str = (data.get('current_max_file_id') or '').strip()
     matching_tables = data.get('matching_tables', [])
     is_need_fileID = data.get('is_need_fileID', False)
@@ -159,10 +157,6 @@ def export_data_multi():
 
     if not old_system_id or not new_system_id:
         return jsonify({'status': 'error', 'message': 'Please enter both Old System ID and New System ID.'})
-    if not save_directory:
-        return jsonify({'status': 'error', 'message': 'Please select a directory to save the SQL files.'})
-    if not os.path.isdir(save_directory):
-        return jsonify({'status': 'error', 'message': f'Directory does not exist: {save_directory}'})
     if not matching_tables:
         return jsonify({'status': 'error', 'message': 'No tables found to export.'})
 
@@ -172,6 +166,7 @@ def export_data_multi():
         conn = get_main_conn()
         lst_fileid = {}
         have_file = False
+        all_files = {}
 
         for table_name in matching_tables:
             if not table_name.strip():
@@ -232,20 +227,24 @@ def export_data_multi():
                     insert_queries.append(
                         f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(values)});"
                     )
-
-            file_path = os.path.join(save_directory, f"{table_name}.sql")
-            with open(file_path, 'w', encoding='utf-8') as f:
-                for q in insert_queries:
-                    f.write(q + '\n')
+            all_files[table_name + '.sql'] = '\n'.join(insert_queries)
 
         conn.close()
 
         if have_file:
             conn_file = get_file_conn()
-            export_data_file_helper(conn_file, lst_fileid, original_max_file_id, save_directory)
+            filedata = export_data_file_helper(conn_file, lst_fileid, original_max_file_id)
+            all_files['T_FILE_DATA_and_S_NUMBER_FILE.sql'] = filedata
             conn_file.close()
 
-        return jsonify({'status': 'success', 'message': 'INSERT and UPDATE statements have been generated and saved to multiple files.'})
+        # Create a zip file in memory
+        import io, zipfile
+        mem_zip = io.BytesIO()
+        with zipfile.ZipFile(mem_zip, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for fname, content in all_files.items():
+                zf.writestr(fname, content)
+        mem_zip.seek(0)
+        return send_file(mem_zip, as_attachment=True, download_name='exported_sql_files.zip', mimetype='application/zip')
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'An error occurred: {str(e)}'})
 
@@ -255,7 +254,6 @@ def export_data_single():
     data = request.get_json()
     old_system_id = (data.get('old_system_id') or '').strip()
     new_system_id = (data.get('new_system_id') or '').strip()
-    save_directory = (data.get('save_directory') or '').strip()
     current_max_file_id_str = (data.get('current_max_file_id') or '').strip()
     matching_tables = data.get('matching_tables', [])
     is_need_fileID = data.get('is_need_fileID', False)
@@ -271,10 +269,6 @@ def export_data_single():
 
     if not old_system_id or not new_system_id:
         return jsonify({'status': 'error', 'message': 'Please enter both Old System ID and New System ID.'})
-    if not save_directory:
-        return jsonify({'status': 'error', 'message': 'Please select a directory to save the SQL files.'})
-    if not os.path.isdir(save_directory):
-        return jsonify({'status': 'error', 'message': f'Directory does not exist: {save_directory}'})
     if not matching_tables:
         return jsonify({'status': 'error', 'message': 'No tables found to export.'})
 
@@ -345,26 +339,192 @@ def export_data_single():
                     insert_queries.append(
                         f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(values)});"
                     )
-
             all_queries.extend(insert_queries)
             all_queries.append("GO")
 
         conn.close()
 
-        file_path = os.path.join(save_directory, 'all_tables.sql')
-        with open(file_path, 'w', encoding='utf-8') as f:
-            for q in all_queries:
-                f.write(q + '\n')
-
         if have_file:
             conn_file = get_file_conn()
-            export_data_file_helper(conn_file, lst_fileid, original_max_file_id, save_directory)
+            filedata = export_data_file_helper(conn_file, lst_fileid, original_max_file_id)
+            all_queries.append(filedata)
             conn_file.close()
 
-        return jsonify({'status': 'success', 'message': 'INSERT and UPDATE statements have been generated and saved to a single file.'})
+        sql_bytes = io.BytesIO()
+        sql_bytes.write('\n'.join(all_queries).encode('utf-8'))
+        sql_bytes.seek(0)
+        return send_file(sql_bytes, as_attachment=True, download_name='all_tables.sql', mimetype='text/plain')
     except Exception as e:
         return jsonify({'status': 'error', 'message': f'An error occurred: {str(e)}'})
 
 
+# ──────────────────────────────────────────────
+#  Config API
+# ──────────────────────────────────────────────
+
+CONFIG_FILES = {
+    'data_string':       'data_string.txt',
+    'file_string':       'file_string.txt',
+    'dataconnectstring': 'dataconnectstring.txt',
+    'table':             'table.txt',
+    'table_logic':       'table_logic.txt',
+}
+
+
+@app.route('/get_config', methods=['GET'])
+def get_config():
+    script_dir = get_script_dir()
+    result = {}
+    for key, filename in CONFIG_FILES.items():
+        path = os.path.join(script_dir, filename)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                result[key] = f.read()
+        except Exception:
+            result[key] = ''
+    return jsonify({'status': 'success', 'config': result})
+
+
+@app.route('/save_config', methods=['POST'])
+def save_config():
+    data = request.get_json()
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No data provided.'})
+    script_dir = get_script_dir()
+    try:
+        for key, filename in CONFIG_FILES.items():
+            if key in data:
+                path = os.path.join(script_dir, filename)
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(data[key])
+        return jsonify({'status': 'success', 'message': 'Configuration saved successfully.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Failed to save configuration: {e}'})
+
+
+# ──────────────────────────────────────────────
+#  Tab 2: Gen Script from Excel
+# ──────────────────────────────────────────────
+
+
+# ──── Gen Script Config API ────
+
+EXCEL_CONFIG_FILES = {
+    'username_id': 'usernameID.txt',
+    'table_info':  'TABLE_INFO.txt',
+}
+
+
+@app.route('/get_excel_config', methods=['GET'])
+def get_excel_config():
+    script_dir = get_script_dir()
+    result = {}
+    # Plain text files
+    for key, filename in EXCEL_CONFIG_FILES.items():
+        path = os.path.join(script_dir, filename)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                result[key] = f.read()
+        except Exception:
+            result[key] = ''
+    # genscript_config.json
+    config_path = os.path.join(script_dir, 'genscript_config.json')
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            result['genscript_config'] = json.load(f)
+    except Exception:
+        result['genscript_config'] = {}
+    return jsonify({'status': 'success', 'config': result})
+
+
+@app.route('/save_excel_config', methods=['POST'])
+def save_excel_config():
+    data = request.get_json()
+    if not data:
+        return jsonify({'status': 'error', 'message': 'No data provided.'})
+    script_dir = get_script_dir()
+    try:
+        # Save usernameID.txt
+        if 'username_id' in data:
+            with open(os.path.join(script_dir, 'usernameID.txt'), 'w', encoding='utf-8') as f:
+                f.write(str(data['username_id']).strip())
+        # Save TABLE_INFO.txt — validate JSON first
+        if 'table_info' in data:
+            try:
+                json.loads(data['table_info'])  # validate
+            except Exception as e:
+                return jsonify({'status': 'error', 'message': f'TABLE_INFO.txt: invalid JSON — {e}'})
+            with open(os.path.join(script_dir, 'TABLE_INFO.txt'), 'w', encoding='utf-8') as f:
+                f.write(data['table_info'])
+        # Save genscript_config.json
+        if 'genscript_config' in data:
+            with open(os.path.join(script_dir, 'genscript_config.json'), 'w', encoding='utf-8') as f:
+                json.dump(data['genscript_config'], f, ensure_ascii=False, indent=2)
+        # Reload constants in the genScriptFromExcel module
+        genScriptFromExcel.reload_config()
+        # Reset username ID counter so it re-reads the updated file
+        genScriptFromExcel._username_id_counter = None
+        return jsonify({'status': 'success', 'message': 'Configuration saved successfully.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Failed to save configuration: {e}'})
+
+
+@app.route('/gen_excel', methods=['POST'])
+def gen_excel():
+    if 'excel_file' not in request.files:
+        return jsonify({'status': 'error', 'message': 'No Excel file uploaded.'})
+
+    excel_file = request.files['excel_file']
+    if not excel_file.filename:
+        return jsonify({'status': 'error', 'message': 'No Excel file selected.'})
+
+    system_id   = request.form.get('system_id', '').strip()
+    system_date = request.form.get('system_date', '').strip()
+
+    # Save uploaded Excel to a temp file
+    tmp_excel = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+    try:
+        excel_file.save(tmp_excel.name)
+        tmp_excel.close()
+    except Exception:
+        tmp_excel.close()
+        try:
+            os.unlink(tmp_excel.name)
+        except OSError:
+            pass
+        return jsonify({'status': 'error', 'message': 'Failed to save uploaded file.'})
+
+    tmp_output = tempfile.NamedTemporaryFile(delete=False, suffix='.sql', mode='w', encoding='utf-8')
+    tmp_output.close()
+
+    try:
+        # Reload config before each run so any saved changes take effect
+        genScriptFromExcel.reload_config()
+        # Override appX globals per-request
+        now = datetime.datetime.now()
+        genScriptFromExcel.systemid_value    = system_id  if system_id   else f"{now.hour:02d}{now.minute:02d}{now.second:02d}"
+        genScriptFromExcel.system_date_value = system_date if system_date else now.strftime('%Y-%m-%d')
+
+        # Path to TABLE_INFO.txt stored next to app.py
+        table_info_path = os.path.join(get_script_dir(), 'TABLE_INFO.txt')
+
+        genScriptFromExcel.all_tables_in_sequence(tmp_excel.name, table_info_path, tmp_output.name)
+
+        with open(tmp_output.name, 'r', encoding='utf-8') as f:
+            sql_content = f.read()
+
+        sql_bytes = io.BytesIO(sql_content.encode('utf-8'))
+        sql_bytes.seek(0)
+        return send_file(sql_bytes, as_attachment=True, download_name='insert_all.sql', mimetype='text/plain')
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'An error occurred: {str(e)}'})
+    finally:
+        for path in (tmp_excel.name, tmp_output.name):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+
 if __name__ == '__main__':
-    app.run(debug=False, host='127.0.0.1', port=5021)
+    app.run(debug=True, host='127.0.0.1', port=5021)

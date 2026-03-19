@@ -20,15 +20,48 @@
         .container {
             background: #fff;
             border-radius: 6px;
-            padding: 20px 24px 24px;
-            width: 500px;
+            width: 520px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            overflow: hidden;
         }
+
+        /* ── Tabs ── */
+        .tab-bar {
+            display: flex;
+            border-bottom: 2px solid #bbb;
+            background: #f5f5f5;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px 0;
+            font-size: 13px;
+            font-weight: bold;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            color: #555;
+            transition: color 0.15s, border-color 0.15s;
+            width: auto;
+        }
+        .tab-btn:hover:not(:disabled) {
+            background: #e8e8e8;
+            color: #222;
+        }
+        .tab-btn.active {
+            color: #1a5c9e;
+            border-bottom-color: #1a5c9e;
+            background: #fff;
+        }
+
+        /* ── Tab panels ── */
+        .tab-panel { display: none; padding: 20px 24px 24px; }
+        .tab-panel.active { display: block; }
 
         h2 {
             text-align: center;
             margin-bottom: 16px;
-            font-size: 17px;
+            font-size: 16px;
             color: #222;
         }
 
@@ -47,13 +80,14 @@
         }
 
         label {
-            width: 162px;
+            width: 165px;
             font-size: 13px;
             color: #333;
             flex-shrink: 0;
         }
 
-        input[type="text"] {
+        input[type="text"],
+        input[type="date"] {
             flex: 1;
             padding: 4px 7px;
             font-size: 13px;
@@ -62,7 +96,13 @@
             height: 26px;
         }
 
-        input[type="text"]:disabled {
+        input[type="file"] {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        input[type="text"]:disabled,
+        input[type="date"]:disabled {
             background: #e9e9e9;
             color: #888;
         }
@@ -75,7 +115,7 @@
 
         textarea {
             width: 100%;
-            height: 110px;
+            height: 100px;
             font-size: 12px;
             padding: 5px 7px;
             border: 1px solid #aaa;
@@ -99,19 +139,12 @@
             border-radius: 3px;
             background: #e0e0e0;
             cursor: pointer;
-            width: 220px;
+            width: 240px;
         }
+        button:hover:not(:disabled) { background: #c8d0dc; }
+        button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-        button:hover:not(:disabled) {
-            background: #c8d0dc;
-        }
-
-        button:disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-        }
-
-        #statusMsg {
+        .status-msg {
             text-align: center;
             margin-top: 10px;
             font-size: 13px;
@@ -120,92 +153,217 @@
             display: none;
             line-height: 1.4;
         }
+        .status-msg.success { background: #d4edda; color: #155724; border: 1px solid #b8dfc5; }
+        .status-msg.error   { background: #f8d7da; color: #721c24; border: 1px solid #f0b8bc; }
+        .status-msg.warning { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+        .status-msg.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #9bd4e0; }
 
-        #statusMsg.success { background: #d4edda; color: #155724; border: 1px solid #b8dfc5; }
-        #statusMsg.error   { background: #f8d7da; color: #721c24; border: 1px solid #f0b8bc; }
-        #statusMsg.warning { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
-        #statusMsg.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #9bd4e0; }
+        .hint {
+            font-size: 11px;
+            color: #888;
+            margin-top: -6px;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h2>DB Export Tool</h2>
 
-    <fieldset>
-        <!-- Old System ID -->
-        <div class="form-row">
-            <label for="oldSystemId">Old System ID:</label>
-            <input type="text" id="oldSystemId" oninput="checkInputs()" autocomplete="off" />
-        </div>
-
-        <!-- New System ID -->
-        <div class="form-row">
-            <label for="newSystemId">New System ID:</label>
-            <input type="text" id="newSystemId" oninput="checkInputs()" autocomplete="off" />
-        </div>
-
-        <!-- Current Max File ID -->
-        <div class="form-row">
-            <label for="currentMaxFileId">Current Max File ID:</label>
-            <input type="text" id="currentMaxFileId" disabled autocomplete="off" />
-        </div>
-
-        <!-- Tables list -->
-        <p class="table-section-label">Tables with matching System ID</p>
-        <textarea id="tableList" readonly></textarea>
-
-        <!-- Save Directory -->
-        <div class="form-row">
-            <label for="saveDirectory">Save Directory:</label>
-            <input type="text" id="saveDirectory" placeholder="e.g. C:\output" autocomplete="off" />
-        </div>
-    </fieldset>
-
-    <div class="btn-row">
-        <button id="connectBtn" onclick="connectToDb()" disabled>Connect to Database</button>
-    </div>
-    <div class="btn-row">
-        <button id="exportMultiBtn" onclick="exportData('multi')" disabled>Export Data multi files</button>
-    </div>
-    <div class="btn-row">
-        <button id="exportSingleBtn" onclick="exportData('single')" disabled>Export Data single file</button>
+    <!-- Tab bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('tab-export')">DB Export</button>
+        <button class="tab-btn"        onclick="switchTab('tab-excel')">Gen Script from Excel</button>
+        <button class="tab-btn"        onclick="switchTab('tab-config')">DB Config</button>
+        <button class="tab-btn"        onclick="switchTab('tab-excel-config')">Gen Script Config</button>
     </div>
 
-    <div id="statusMsg"></div>
-</div>
+    <!-- ══════════════ TAB 1: DB Export ══════════════ -->
+    <div id="tab-export" class="tab-panel active">
+        <h2>DB Export Tool</h2>
+        <fieldset>
+            <div class="form-row">
+                <label for="oldSystemId">Old System ID:</label>
+                <input type="text" id="oldSystemId" oninput="checkExportInputs()" autocomplete="off" />
+            </div>
+            <div class="form-row">
+                <label for="newSystemId">New System ID:</label>
+                <input type="text" id="newSystemId" oninput="checkExportInputs()" autocomplete="off" />
+            </div>
+            <div class="form-row">
+                <label for="currentMaxFileId">Current Max File ID:</label>
+                <input type="text" id="currentMaxFileId" disabled autocomplete="off" />
+            </div>
+            <p class="table-section-label">Tables with matching System ID</p>
+            <textarea id="tableList" readonly></textarea>
+        </fieldset>
+
+        <div class="btn-row">
+            <button id="connectBtn" onclick="connectToDb()" disabled>Connect to Database</button>
+        </div>
+        <div class="btn-row">
+            <button id="exportMultiBtn" onclick="exportData('multi')" disabled>Export Data multi files (.zip)</button>
+        </div>
+        <div class="btn-row">
+            <button id="exportSingleBtn" onclick="exportData('single')" disabled>Export Data single file (.sql)</button>
+        </div>
+        <div id="exportStatus" class="status-msg"></div>
+    </div>
+
+    <!-- ══════════════ TAB 3: Config ══════════════ -->
+    <div id="tab-config" class="tab-panel">
+        <h2>DB Export Config</h2>
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">Connection Strings</legend>
+            <div style="margin-bottom:10px;">
+                <p class="table-section-label" style="margin-bottom:4px;">data_string.txt (Main DB)</p>
+                <input type="text" id="cfgDataString" style="width:100%;" autocomplete="off" />
+            </div>
+            <div style="margin-bottom:10px;">
+                <p class="table-section-label" style="margin-bottom:4px;">file_string.txt (File DB)</p>
+                <input type="text" id="cfgFileString" style="width:100%;" autocomplete="off" />
+            </div>
+            <div>
+                <p class="table-section-label" style="margin-bottom:4px;">dataconnectstring.txt</p>
+                <input type="text" id="cfgDataConnect" style="width:100%;" autocomplete="off" />
+            </div>
+        </fieldset>
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">Table Lists</legend>
+            <div style="margin-bottom:10px;">
+                <p class="table-section-label" style="margin-bottom:4px;">table.txt</p>
+                <textarea id="cfgTable" style="height:110px;"></textarea>
+            </div>
+            <div>
+                <p class="table-section-label" style="margin-bottom:4px;">table_logic.txt</p>
+                <textarea id="cfgTableLogic" style="height:110px;"></textarea>
+            </div>
+        </fieldset>
+        <div class="btn-row">
+            <button id="saveConfigBtn" onclick="saveConfig()">Save Config</button>
+        </div>
+        <div id="configStatus" class="status-msg"></div>
+    </div>
+
+    <!-- ══════════════ TAB 2: Gen Script from Excel ══════════════ -->
+    <div id="tab-excel" class="tab-panel">
+        <h2>Gen Script from Excel</h2>
+        <fieldset>
+            <div class="form-row">
+                <label for="excelFile">Excel File (.xlsx):</label>
+                <input type="file" id="excelFile" accept=".xlsx" />
+            </div>
+            <div class="form-row">
+                <label for="genSystemId">System ID:</label>
+                <input type="text" id="genSystemId" placeholder="(optional)" autocomplete="off" />
+            </div>
+            <p class="hint" style="margin-left:173px;">省略時は現在時刻 (HHMMSS) を使用</p>
+            <div class="form-row">
+                <label for="genSystemDate">System Date:</label>
+                <input type="date" id="genSystemDate" />
+            </div>
+            <p class="hint" style="margin-left:173px;">省略時は本日の日付を使用</p>
+        </fieldset>
+
+        <div class="btn-row">
+            <button id="genBtn" onclick="genFromExcel()">Generate insert_all.sql</button>
+        </div>
+        <div id="excelStatus" class="status-msg"></div>
+    </div>
+
+    <!-- ══════════════ TAB 4: Gen Script Config ══════════════ -->
+    <div id="tab-excel-config" class="tab-panel">
+        <h2>Gen Script Config</h2>
+
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">User Settings (usernameID.txt)</legend>
+            <div class="form-row">
+                <label for="cfgUsernameId">Username ID:</label>
+                <input type="text" id="cfgUsernameId" autocomplete="off" />
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">Sheet Filter</legend>
+            <p class="table-section-label" style="margin-bottom:4px;">Excluded Sheet Names (one per line)</p>
+            <textarea id="cfgExcludedSheets" style="height:80px;"></textarea>
+            <p class="table-section-label" style="margin-bottom:4px;">Stop Values (one per line)</p>
+            <textarea id="cfgStopValues" style="height:100px;"></textarea>
+        </fieldset>
+
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">Type Mappings (JSON)</legend>
+            <p class="table-section-label" style="margin-bottom:4px;">Mapping Value Dict</p>
+            <textarea id="cfgMappingValueDict" style="height:100px;font-family:monospace;"></textarea>
+            <p class="table-section-label" style="margin-bottom:4px;">Koumoku Type Mapping</p>
+            <textarea id="cfgKoumokuTypeMapping" style="height:130px;font-family:monospace;"></textarea>
+            <p class="table-section-label" style="margin-bottom:4px;">Koumoku Type Mapping RE</p>
+            <textarea id="cfgKoumokuTypeMappingRe" style="height:120px;font-family:monospace;"></textarea>
+        </fieldset>
+
+        <fieldset>
+            <legend style="font-size:12px;color:#555;padding:0 4px;">TABLE_INFO.txt (raw JSON)</legend>
+            <textarea id="cfgTableInfo" style="height:180px;font-family:monospace;font-size:11px;"></textarea>
+        </fieldset>
+
+        <div class="btn-row">
+            <button id="saveExcelConfigBtn" onclick="saveExcelConfig()">Save Gen Script Config</button>
+        </div>
+        <div id="excelConfigStatus" class="status-msg"></div>
+    </div>
+
+</div><!-- /container -->
 
 <script>
-    let matchingTables = [];
-    let isNeedFileID = false;
+    // ── Tab switching ──────────────────────────────
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            if ((b.getAttribute('onclick') || '').includes(tabId)) b.classList.add('active');
+        });
+        if (tabId === 'tab-config') loadConfig();
+        if (tabId === 'tab-excel-config') loadExcelConfig();
+    }
 
-    function checkInputs() {
+    // ── Helpers ───────────────────────────────────
+    function showMsg(elId, msg, type) {
+        const el = document.getElementById(elId);
+        el.textContent = msg;
+        el.className = 'status-msg ' + type;
+        el.style.display = 'block';
+    }
+    function hideMsg(elId) { document.getElementById(elId).style.display = 'none'; }
+
+    function setBusy(btn, busy, label) {
+        btn.disabled = busy;
+        btn.textContent = busy ? label + ' ...' : label;
+    }
+
+    async function downloadBlob(resp, filename) {
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // ── Tab 1: DB Export ──────────────────────────
+    let matchingTables = [];
+    let isNeedFileID   = false;
+
+    function checkExportInputs() {
         const ok = document.getElementById('oldSystemId').value.trim() &&
                    document.getElementById('newSystemId').value.trim();
         document.getElementById('connectBtn').disabled = !ok;
     }
 
-    function showMessage(msg, type) {
-        const el = document.getElementById('statusMsg');
-        el.textContent = msg;
-        el.className = type;
-        el.style.display = 'block';
-    }
-
-    function hideMessage() {
-        const el = document.getElementById('statusMsg');
-        el.style.display = 'none';
-    }
-
-    function setButtonWorking(btn, working, label) {
-        btn.disabled = working;
-        btn.textContent = working ? label + ' ...' : label;
-    }
-
     async function connectToDb() {
         const oldSystemId = document.getElementById('oldSystemId').value.trim();
         const btn = document.getElementById('connectBtn');
-        setButtonWorking(btn, true, 'Connect to Database');
-        hideMessage();
+        setBusy(btn, true, 'Connect to Database');
+        hideMsg('exportStatus');
 
         try {
             const resp = await fetch('/connect', {
@@ -218,88 +376,249 @@
             if (result.status === 'success') {
                 matchingTables = result.matching_tables;
                 isNeedFileID   = result.is_need_fileID;
-
                 document.getElementById('tableList').value = matchingTables.join('\n');
-
-                const fileIdField = document.getElementById('currentMaxFileId');
-                fileIdField.disabled = !isNeedFileID;
-                if (!isNeedFileID) fileIdField.value = '';
-
+                const fid = document.getElementById('currentMaxFileId');
+                fid.disabled = !isNeedFileID;
+                if (!isNeedFileID) fid.value = '';
                 document.getElementById('exportMultiBtn').disabled  = false;
                 document.getElementById('exportSingleBtn').disabled = false;
-                showMessage(result.message, 'success');
-
+                showMsg('exportStatus', result.message, 'success');
             } else if (result.status === 'warning') {
                 matchingTables = [];
                 document.getElementById('tableList').value = '';
                 document.getElementById('exportMultiBtn').disabled  = true;
                 document.getElementById('exportSingleBtn').disabled = true;
-                showMessage(result.message, 'warning');
-
+                showMsg('exportStatus', result.message, 'warning');
             } else {
-                showMessage(result.message, 'error');
+                showMsg('exportStatus', result.message, 'error');
             }
         } catch (err) {
-            showMessage('Network error: ' + err.message, 'error');
+            showMsg('exportStatus', 'Network error: ' + err.message, 'error');
         } finally {
-            setButtonWorking(btn, false, 'Connect to Database');
-            checkInputs();
+            setBusy(btn, false, 'Connect to Database');
+            checkExportInputs();
         }
     }
 
-    async function exportData(mode) {
-        const oldSystemId    = document.getElementById('oldSystemId').value.trim();
-        const newSystemId    = document.getElementById('newSystemId').value.trim();
-        const saveDirectory  = document.getElementById('saveDirectory').value.trim();
-        const currentMaxFileId = document.getElementById('currentMaxFileId').value.trim();
+    function resetExportForm() {
+        matchingTables = []; isNeedFileID = false;
+        ['tableList', 'oldSystemId', 'newSystemId', 'currentMaxFileId'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('currentMaxFileId').disabled = true;
+        document.getElementById('exportMultiBtn').disabled  = true;
+        document.getElementById('exportSingleBtn').disabled = true;
+        checkExportInputs();
+    }
 
+    async function exportData(mode) {
+        const oldSystemId      = document.getElementById('oldSystemId').value.trim();
+        const newSystemId      = document.getElementById('newSystemId').value.trim();
+        const currentMaxFileId = document.getElementById('currentMaxFileId').value.trim();
         const isMulti  = mode === 'multi';
         const btnId    = isMulti ? 'exportMultiBtn' : 'exportSingleBtn';
-        const btnLabel = isMulti ? 'Export Data multi files' : 'Export Data single file';
+        const btnLabel = isMulti ? 'Export Data multi files (.zip)' : 'Export Data single file (.sql)';
         const btn      = document.getElementById(btnId);
 
-        setButtonWorking(btn, true, btnLabel);
-        hideMessage();
+        setBusy(btn, true, btnLabel);
+        hideMsg('exportStatus');
 
         try {
             const resp = await fetch(`/export_${mode}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    old_system_id:    oldSystemId,
-                    new_system_id:    newSystemId,
-                    save_directory:   saveDirectory,
+                    old_system_id:       oldSystemId,
+                    new_system_id:       newSystemId,
                     current_max_file_id: currentMaxFileId,
-                    matching_tables:  matchingTables,
-                    is_need_fileID:   isNeedFileID
+                    matching_tables:     matchingTables,
+                    is_need_fileID:      isNeedFileID
+                })
+            });
+
+            const ct = resp.headers.get('content-type') || '';
+            if (resp.ok && ct.includes('application/zip')) {
+                await downloadBlob(resp, 'exported_sql_files.zip');
+                showMsg('exportStatus', 'ダウンロード完了 (zip)', 'success');
+                resetExportForm();
+            } else if (resp.ok && ct.includes('text/plain')) {
+                await downloadBlob(resp, 'all_tables.sql');
+                showMsg('exportStatus', 'ダウンロード完了 (sql)', 'success');
+                resetExportForm();
+            } else {
+                const result = await resp.json();
+                showMsg('exportStatus', result.message || 'エラーが発生しました', 'error');
+            }
+        } catch (err) {
+            showMsg('exportStatus', 'Network error: ' + err.message, 'error');
+        } finally {
+            setBusy(btn, false, btnLabel);
+        }
+    }
+
+    // ── Tab 2: Gen Script from Excel ─────────────
+    async function genFromExcel() {
+        const fileInput = document.getElementById('excelFile');
+        if (!fileInput.files.length) {
+            showMsg('excelStatus', 'Please select an Excel file.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('genBtn');
+        setBusy(btn, true, 'Generate insert_all.sql');
+        hideMsg('excelStatus');
+        showMsg('excelStatus', 'Processing... this may take a moment.', 'info');
+
+        const formData = new FormData();
+        formData.append('excel_file', fileInput.files[0]);
+        formData.append('system_id',   document.getElementById('genSystemId').value.trim());
+        formData.append('system_date', document.getElementById('genSystemDate').value);
+
+        try {
+            const resp = await fetch('/gen_excel', {
+                method: 'POST',
+                body: formData
+            });
+
+            const ct = resp.headers.get('content-type') || '';
+            if (resp.ok && ct.includes('text/plain')) {
+                await downloadBlob(resp, 'insert_all.sql');
+                showMsg('excelStatus', 'insert_all.sql のダウンロード完了！', 'success');
+                fileInput.value = '';
+            } else {
+                const result = await resp.json();
+                showMsg('excelStatus', result.message || 'エラーが発生しました', 'error');
+            }
+        } catch (err) {
+            showMsg('excelStatus', 'Network error: ' + err.message, 'error');
+        } finally {
+            setBusy(btn, false, 'Generate insert_all.sql');
+        }
+    }
+
+    // Set today as default system date on load
+    document.getElementById('genSystemDate').value = new Date().toISOString().slice(0, 10);
+
+    // ── Tab 4: Gen Script Config ───────────────────────
+    async function loadExcelConfig() {
+        hideMsg('excelConfigStatus');
+        try {
+            const resp = await fetch('/get_excel_config');
+            const result = await resp.json();
+            if (result.status !== 'success') {
+                showMsg('excelConfigStatus', result.message, 'error');
+                return;
+            }
+            const c = result.config;
+            document.getElementById('cfgUsernameId').value = (c.username_id || '').trim();
+            document.getElementById('cfgTableInfo').value  = c.table_info || '';
+            const gc = c.genscript_config || {};
+            document.getElementById('cfgExcludedSheets').value =
+                (gc.excluded_sheetnames || []).join('\n');
+            document.getElementById('cfgStopValues').value =
+                (gc.stop_values || []).join('\n');
+            document.getElementById('cfgMappingValueDict').value =
+                JSON.stringify(gc.mapping_value_dict || {}, null, 2);
+            document.getElementById('cfgKoumokuTypeMapping').value =
+                JSON.stringify(gc.koumoku_type_mapping || {}, null, 2);
+            document.getElementById('cfgKoumokuTypeMappingRe').value =
+                JSON.stringify(gc.koumoku_type_mapping_re || {}, null, 2);
+        } catch (err) {
+            showMsg('excelConfigStatus', 'Network error: ' + err.message, 'error');
+        }
+    }
+
+    async function saveExcelConfig() {
+        // Validate JSON fields before sending
+        let mapping_value_dict, koumoku_type_mapping, koumoku_type_mapping_re;
+        try { mapping_value_dict = JSON.parse(document.getElementById('cfgMappingValueDict').value); }
+        catch (e) { showMsg('excelConfigStatus', 'Mapping Value Dict: invalid JSON — ' + e.message, 'error'); return; }
+        try { koumoku_type_mapping = JSON.parse(document.getElementById('cfgKoumokuTypeMapping').value); }
+        catch (e) { showMsg('excelConfigStatus', 'Koumoku Type Mapping: invalid JSON — ' + e.message, 'error'); return; }
+        try { koumoku_type_mapping_re = JSON.parse(document.getElementById('cfgKoumokuTypeMappingRe').value); }
+        catch (e) { showMsg('excelConfigStatus', 'Koumoku Type Mapping RE: invalid JSON — ' + e.message, 'error'); return; }
+        // TABLE_INFO is validated server-side, but give a quick client hint
+        try { JSON.parse(document.getElementById('cfgTableInfo').value); }
+        catch (e) { showMsg('excelConfigStatus', 'TABLE_INFO.txt: invalid JSON — ' + e.message, 'error'); return; }
+
+        const btn = document.getElementById('saveExcelConfigBtn');
+        setBusy(btn, true, 'Save Gen Script Config');
+        hideMsg('excelConfigStatus');
+
+        const payload = {
+            username_id: document.getElementById('cfgUsernameId').value.trim(),
+            table_info:  document.getElementById('cfgTableInfo').value,
+            genscript_config: {
+                mapping_value_dict,
+                koumoku_type_mapping,
+                koumoku_type_mapping_re,
+                stop_values: document.getElementById('cfgStopValues').value
+                    .split('\n').map(s => s.trim()).filter(s => s),
+                excluded_sheetnames: document.getElementById('cfgExcludedSheets').value
+                    .split('\n').map(s => s.trim()).filter(s => s),
+            }
+        };
+
+        try {
+            const resp = await fetch('/save_excel_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await resp.json();
+            showMsg('excelConfigStatus', result.message, result.status === 'success' ? 'success' : 'error');
+        } catch (err) {
+            showMsg('excelConfigStatus', 'Network error: ' + err.message, 'error');
+        } finally {
+            setBusy(btn, false, 'Save Gen Script Config');
+        }
+    }
+
+    // ── Tab 3: DB Config ──────────────────────────
+    async function loadConfig() {
+        hideMsg('configStatus');
+        try {
+            const resp = await fetch('/get_config');
+            const result = await resp.json();
+            if (result.status === 'success') {
+                const c = result.config;
+                document.getElementById('cfgDataString').value  = (c.data_string       || '').trim();
+                document.getElementById('cfgFileString').value  = (c.file_string       || '').trim();
+                document.getElementById('cfgDataConnect').value = (c.dataconnectstring || '').trim();
+                document.getElementById('cfgTable').value       = (c.table             || '').trim();
+                document.getElementById('cfgTableLogic').value  = (c.table_logic       || '').trim();
+            } else {
+                showMsg('configStatus', result.message, 'error');
+            }
+        } catch (err) {
+            showMsg('configStatus', 'Network error: ' + err.message, 'error');
+        }
+    }
+
+    async function saveConfig() {
+        const btn = document.getElementById('saveConfigBtn');
+        setBusy(btn, true, 'Save Config');
+        hideMsg('configStatus');
+        try {
+            const resp = await fetch('/save_config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    data_string:       document.getElementById('cfgDataString').value,
+                    file_string:       document.getElementById('cfgFileString').value,
+                    dataconnectstring: document.getElementById('cfgDataConnect').value,
+                    table:             document.getElementById('cfgTable').value,
+                    table_logic:       document.getElementById('cfgTableLogic').value,
                 })
             });
             const result = await resp.json();
-
-            if (result.status === 'success') {
-                showMessage(result.message, 'success');
-
-                // Reset – mirrors the original post-export reset in main.py
-                matchingTables = [];
-                isNeedFileID   = false;
-                document.getElementById('tableList').value = '';
-                document.getElementById('oldSystemId').value = '';
-                document.getElementById('newSystemId').value = '';
-                document.getElementById('currentMaxFileId').value = '';
-                document.getElementById('currentMaxFileId').disabled = true;
-                document.getElementById('exportMultiBtn').disabled  = true;
-                document.getElementById('exportSingleBtn').disabled = true;
-                checkInputs();
-
-            } else {
-                showMessage(result.message, 'error');
-            }
+            showMsg('configStatus', result.message, result.status === 'success' ? 'success' : 'error');
         } catch (err) {
-            showMessage('Network error: ' + err.message, 'error');
+            showMsg('configStatus', 'Network error: ' + err.message, 'error');
         } finally {
-            setButtonWorking(btn, false, btnLabel);
+            setBusy(btn, false, 'Save Config');
         }
     }
 </script>
 </body>
-</html>
+
