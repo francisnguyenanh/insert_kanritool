@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB Export Tool</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 30px 10px;
+        }
+
+        .container {
+            background: #fff;
+            border-radius: 6px;
+            padding: 20px 24px 24px;
+            width: 500px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 16px;
+            font-size: 17px;
+            color: #222;
+        }
+
+        fieldset {
+            border: 1px solid #bbb;
+            border-radius: 5px;
+            padding: 14px 16px 10px;
+            margin-bottom: 14px;
+        }
+
+        .form-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 9px;
+            gap: 8px;
+        }
+
+        label {
+            width: 162px;
+            font-size: 13px;
+            color: #333;
+            flex-shrink: 0;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 4px 7px;
+            font-size: 13px;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            height: 26px;
+        }
+
+        input[type="text"]:disabled {
+            background: #e9e9e9;
+            color: #888;
+        }
+
+        .table-section-label {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 4px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 110px;
+            font-size: 12px;
+            padding: 5px 7px;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            resize: vertical;
+            background: #fafafa;
+            font-family: monospace;
+            margin-bottom: 9px;
+        }
+
+        .btn-row {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 8px;
+        }
+
+        button {
+            padding: 6px 0;
+            font-size: 13px;
+            border: 1px solid #888;
+            border-radius: 3px;
+            background: #e0e0e0;
+            cursor: pointer;
+            width: 220px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #c8d0dc;
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        #statusMsg {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 13px;
+            padding: 7px 10px;
+            border-radius: 4px;
+            display: none;
+            line-height: 1.4;
+        }
+
+        #statusMsg.success { background: #d4edda; color: #155724; border: 1px solid #b8dfc5; }
+        #statusMsg.error   { background: #f8d7da; color: #721c24; border: 1px solid #f0b8bc; }
+        #statusMsg.warning { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+        #statusMsg.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #9bd4e0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>DB Export Tool</h2>
+
+    <fieldset>
+        <!-- Old System ID -->
+        <div class="form-row">
+            <label for="oldSystemId">Old System ID:</label>
+            <input type="text" id="oldSystemId" oninput="checkInputs()" autocomplete="off" />
+        </div>
+
+        <!-- New System ID -->
+        <div class="form-row">
+            <label for="newSystemId">New System ID:</label>
+            <input type="text" id="newSystemId" oninput="checkInputs()" autocomplete="off" />
+        </div>
+
+        <!-- Current Max File ID -->
+        <div class="form-row">
+            <label for="currentMaxFileId">Current Max File ID:</label>
+            <input type="text" id="currentMaxFileId" disabled autocomplete="off" />
+        </div>
+
+        <!-- Tables list -->
+        <p class="table-section-label">Tables with matching System ID</p>
+        <textarea id="tableList" readonly></textarea>
+
+        <!-- Save Directory -->
+        <div class="form-row">
+            <label for="saveDirectory">Save Directory:</label>
+            <input type="text" id="saveDirectory" placeholder="e.g. C:\output" autocomplete="off" />
+        </div>
+    </fieldset>
+
+    <div class="btn-row">
+        <button id="connectBtn" onclick="connectToDb()" disabled>Connect to Database</button>
+    </div>
+    <div class="btn-row">
+        <button id="exportMultiBtn" onclick="exportData('multi')" disabled>Export Data multi files</button>
+    </div>
+    <div class="btn-row">
+        <button id="exportSingleBtn" onclick="exportData('single')" disabled>Export Data single file</button>
+    </div>
+
+    <div id="statusMsg"></div>
+</div>
+
+<script>
+    let matchingTables = [];
+    let isNeedFileID = false;
+
+    function checkInputs() {
+        const ok = document.getElementById('oldSystemId').value.trim() &&
+                   document.getElementById('newSystemId').value.trim();
+        document.getElementById('connectBtn').disabled = !ok;
+    }
+
+    function showMessage(msg, type) {
+        const el = document.getElementById('statusMsg');
+        el.textContent = msg;
+        el.className = type;
+        el.style.display = 'block';
+    }
+
+    function hideMessage() {
+        const el = document.getElementById('statusMsg');
+        el.style.display = 'none';
+    }
+
+    function setButtonWorking(btn, working, label) {
+        btn.disabled = working;
+        btn.textContent = working ? label + ' ...' : label;
+    }
+
+    async function connectToDb() {
+        const oldSystemId = document.getElementById('oldSystemId').value.trim();
+        const btn = document.getElementById('connectBtn');
+        setButtonWorking(btn, true, 'Connect to Database');
+        hideMessage();
+
+        try {
+            const resp = await fetch('/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_system_id: oldSystemId })
+            });
+            const result = await resp.json();
+
+            if (result.status === 'success') {
+                matchingTables = result.matching_tables;
+                isNeedFileID   = result.is_need_fileID;
+
+                document.getElementById('tableList').value = matchingTables.join('\n');
+
+                const fileIdField = document.getElementById('currentMaxFileId');
+                fileIdField.disabled = !isNeedFileID;
+                if (!isNeedFileID) fileIdField.value = '';
+
+                document.getElementById('exportMultiBtn').disabled  = false;
+                document.getElementById('exportSingleBtn').disabled = false;
+                showMessage(result.message, 'success');
+
+            } else if (result.status === 'warning') {
+                matchingTables = [];
+                document.getElementById('tableList').value = '';
+                document.getElementById('exportMultiBtn').disabled  = true;
+                document.getElementById('exportSingleBtn').disabled = true;
+                showMessage(result.message, 'warning');
+
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (err) {
+            showMessage('Network error: ' + err.message, 'error');
+        } finally {
+            setButtonWorking(btn, false, 'Connect to Database');
+            checkInputs();
+        }
+    }
+
+    async function exportData(mode) {
+        const oldSystemId    = document.getElementById('oldSystemId').value.trim();
+        const newSystemId    = document.getElementById('newSystemId').value.trim();
+        const saveDirectory  = document.getElementById('saveDirectory').value.trim();
+        const currentMaxFileId = document.getElementById('currentMaxFileId').value.trim();
+
+        const isMulti  = mode === 'multi';
+        const btnId    = isMulti ? 'exportMultiBtn' : 'exportSingleBtn';
+        const btnLabel = isMulti ? 'Export Data multi files' : 'Export Data single file';
+        const btn      = document.getElementById(btnId);
+
+        setButtonWorking(btn, true, btnLabel);
+        hideMessage();
+
+        try {
+            const resp = await fetch(`/export_${mode}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    old_system_id:    oldSystemId,
+                    new_system_id:    newSystemId,
+                    save_directory:   saveDirectory,
+                    current_max_file_id: currentMaxFileId,
+                    matching_tables:  matchingTables,
+                    is_need_fileID:   isNeedFileID
+                })
+            });
+            const result = await resp.json();
+
+            if (result.status === 'success') {
+                showMessage(result.message, 'success');
+
+                // Reset – mirrors the original post-export reset in main.py
+                matchingTables = [];
+                isNeedFileID   = false;
+                document.getElementById('tableList').value = '';
+                document.getElementById('oldSystemId').value = '';
+                document.getElementById('newSystemId').value = '';
+                document.getElementById('currentMaxFileId').value = '';
+                document.getElementById('currentMaxFileId').disabled = true;
+                document.getElementById('exportMultiBtn').disabled  = true;
+                document.getElementById('exportSingleBtn').disabled = true;
+                checkInputs();
+
+            } else {
+                showMessage(result.message, 'error');
+            }
+        } catch (err) {
+            showMessage('Network error: ' + err.message, 'error');
+        } finally {
+            setButtonWorking(btn, false, btnLabel);
+        }
+    }
+</script>
+</body>
+</html>
