@@ -319,6 +319,41 @@
             padding: 5px 14px;
             font-size: 12px;
         }
+
+        /* ── Step indicator ─────────────────────── */
+        .step-section { margin-bottom: 4px; }
+        .step-header  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .step-number  {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border-radius: 50%;
+            background: #1a5c9e; color: #fff;
+            font-size: 12px; font-weight: 700; flex-shrink: 0;
+        }
+        .step-title { font-size: 13px; font-weight: 700; color: #333; }
+        .step-divider { border: none; border-top: 1px solid #e0e0e0; margin: 16px 0; }
+
+        /* ── Table check list ───────────────────── */
+        #fetchTablesBtn {
+            width: auto; padding: 5px 16px; font-size: 13px;
+            background: #1a5c9e; color: #fff; border-color: #1a5c9e;
+        }
+        #fetchTablesBtn:hover:not(:disabled) { background: #154e8a; }
+        #fetchStatus { font-size: 12px; color: #666; }
+        .table-check-list {
+            max-height: 240px; overflow-y: auto;
+            border: 1px solid #ddd; border-radius: 4px;
+            background: #fff; padding: 4px 0;
+        }
+        .table-check-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 10px; cursor: pointer;
+            font-size: 0.82rem; font-family: monospace;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .table-check-item:last-child { border-bottom: none; }
+        .table-check-item:hover { background: #f0f4ff; }
+        .table-check-item input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
+        .table-check-item.hidden { display: none; }
     </style>
 </head>
 <body>
@@ -530,30 +565,67 @@
 
             <!-- Migration Control tab -->
             <div id="repro-proc" class="tab-panel active">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-                    <button id="startBtn" onclick="startReproduction()">
-                        &#x25B6; Start Reproduction Process
-                    </button>
-                    <span id="statusBadge" class="repro-badge" style="display:none;">Idle</span>
+
+                <!-- ── Step 1: Fetch Tables ──────────────────────── -->
+                <div class="step-section">
+                    <div class="step-header">
+                        <span class="step-number">1</span>
+                        <span class="step-title">Lấy danh sách bảng từ DB nguồn</span>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <button id="fetchTablesBtn" onclick="fetchTables()">&#x1F50D; Fetch Tables</button>
+                        <span id="fetchStatus"></span>
+                    </div>
+
+                    <!-- Table list (hidden until fetched) -->
+                    <div id="tableListPanel" style="display:none;margin-top:12px;">
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+                            <input type="text" id="tableSearch" placeholder="&#x1F50D; Tìm bảng..."
+                                oninput="filterTableList(this.value)"
+                                style="flex:1;min-width:160px;max-width:260px;height:26px;
+                                       padding:3px 7px;font-size:12px;border:1px solid #aaa;border-radius:3px;" />
+                            <button onclick="toggleAllTables(true)"  style="width:auto;padding:3px 10px;font-size:12px;">&#x2611; Chọn tất cả</button>
+                            <button onclick="toggleAllTables(false)" style="width:auto;padding:3px 10px;font-size:12px;">&#x2610; Bỏ tất cả</button>
+                            <span id="selectionCount" style="font-size:12px;color:#1a5c9e;font-weight:600;white-space:nowrap;"></span>
+                        </div>
+                        <div id="tableCheckList" class="table-check-list"></div>
+                    </div>
                 </div>
 
-                <div id="progressWrapper" class="repro-progress">
-                    <div class="repro-progress-labels">
-                        <span id="progressLabel">Processing...</span>
-                        <span id="progressPercent">0%</span>
+                <hr class="step-divider" />
+
+                <!-- ── Step 2: Start Migration ────────────────────── -->
+                <div class="step-section">
+                    <div class="step-header">
+                        <span class="step-number">2</span>
+                        <span class="step-title">Thực hiện Migration</span>
                     </div>
-                    <div class="progress-outer">
-                        <div id="progressBar" class="progress-inner"></div>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+                        <button id="startBtn" onclick="startReproduction()" disabled>
+                            &#x25B6; Bắt đầu Migration
+                        </button>
+                        <span id="statusBadge" class="repro-badge" style="display:none;">Idle</span>
+                    </div>
+
+                    <div id="progressWrapper" class="repro-progress">
+                        <div class="repro-progress-labels">
+                            <span id="progressLabel">Processing...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="progress-outer">
+                            <div id="progressBar" class="progress-inner"></div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-size:0.8rem;font-weight:600;color:#555;">Process Log</span>
+                        <button onclick="clearLog()" style="width:auto;padding:2px 12px;font-size:12px;">&#x1F5D1; Clear</button>
+                    </div>
+                    <div id="log-output">
+                        <span class="log-info">// Waiting to start...</span>
                     </div>
                 </div>
 
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span style="font-size:0.8rem;font-weight:600;color:#555;">Process Log</span>
-                    <button onclick="clearLog()" style="width:auto;padding:2px 12px;font-size:12px;">&#x1F5D1; Clear</button>
-                </div>
-                <div id="log-output">
-                    <span class="log-info">// Waiting to start...</span>
-                </div>
             </div>
 
             <!-- Configuration tab -->
@@ -1003,7 +1075,124 @@
     //  DB REPRODUCER — Migration  (logic unchanged)
     // ════════════════════════════════════════════════════════
 
+    // ════════════════════════════════════════════════════════
+    //  DB REPRODUCER — Step 1: Fetch Tables
+    // ════════════════════════════════════════════════════════
+
+    let _allTables = [];
+
+    async function fetchTables() {
+        const btn = document.getElementById('fetchTablesBtn');
+        const st  = document.getElementById('fetchStatus');
+        btn.disabled = true;
+        btn.innerHTML = '&#x23F3; Đang lấy...';
+        st.textContent = '';
+        st.style.color = '#666';
+        document.getElementById('tableListPanel').style.display = 'none';
+        document.getElementById('startBtn').disabled = true;
+
+        const cfg = readReproConfig();
+        if (!cfg.src_conn_str || !cfg.src_db_name) {
+            st.textContent = '⚠ Vui lòng điền Connection String và DB Name nguồn trong tab Configuration.';
+            st.style.color = '#c00';
+            btn.disabled = false;
+            btn.innerHTML = '&#x1F50D; Fetch Tables';
+            return;
+        }
+        try {
+            const resp = await fetch('/reproduce/tables', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ src_conn_str: cfg.src_conn_str, src_db_name: cfg.src_db_name })
+            });
+            const result = await resp.json();
+            if (result.status !== 'success') {
+                st.textContent = '✗ ' + (result.message || 'Không thể kết nối.');
+                st.style.color = '#c00';
+                return;
+            }
+            _allTables = result.tables || [];
+            // Load previously-saved selection, auto-check matching names
+            const selResp   = await fetch('/reproduce/selected-tables');
+            const selResult = await selResp.json();
+            const prevSelected = new Set((selResult.selected || []).map(s => s.toUpperCase()));
+            renderTableList(_allTables, prevSelected);
+            document.getElementById('tableListPanel').style.display = 'block';
+            st.textContent = `✓ ${_allTables.length} bảng`;
+            st.style.color = '#1a5c9e';
+        } catch (err) {
+            st.textContent = '✗ Network error: ' + err.message;
+            st.style.color = '#c00';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '&#x1F50D; Fetch Tables';
+        }
+    }
+
+    function renderTableList(tables, prevSelected) {
+        const container = document.getElementById('tableCheckList');
+        container.innerHTML = '';
+        tables.forEach(tbl => {
+            const checked = prevSelected.has(tbl.toUpperCase());
+            const label   = document.createElement('label');
+            label.className      = 'table-check-item';
+            label.dataset.name   = tbl.toLowerCase();
+            const cb = document.createElement('input');
+            cb.type    = 'checkbox';
+            cb.value   = tbl;
+            cb.checked = checked;
+            cb.addEventListener('change', updateTableSelectionCount);
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(tbl));
+            container.appendChild(label);
+        });
+        updateTableSelectionCount();
+    }
+
+    function toggleAllTables(checked) {
+        document.querySelectorAll(
+            '#tableCheckList .table-check-item:not(.hidden) input[type="checkbox"]'
+        ).forEach(cb => { cb.checked = checked; });
+        updateTableSelectionCount();
+    }
+
+    function updateTableSelectionCount() {
+        const total   = document.querySelectorAll('#tableCheckList input[type="checkbox"]').length;
+        const checked = document.querySelectorAll('#tableCheckList input[type="checkbox"]:checked').length;
+        document.getElementById('selectionCount').textContent = `${checked} / ${total} bảng được chọn`;
+        document.getElementById('startBtn').disabled = checked === 0;
+    }
+
+    function filterTableList(query) {
+        const q = query.toLowerCase().trim();
+        document.querySelectorAll('#tableCheckList .table-check-item').forEach(item => {
+            item.classList.toggle('hidden', q !== '' && !(item.dataset.name || '').includes(q));
+        });
+    }
+
+    function getSelectedTables() {
+        return Array.from(
+            document.querySelectorAll('#tableCheckList input[type="checkbox"]:checked')
+        ).map(cb => cb.value);
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  DB REPRODUCER — Step 2: Start Migration
+    // ════════════════════════════════════════════════════════
+
     async function startReproduction() {
+        const selectedTables = getSelectedTables();
+        if (!selectedTables.length) {
+            appendLog('[WARN] Chưa chọn bảng nào.', 'log-warning');
+            return;
+        }
+        // Persist selection before starting so next fetch auto-checks same tables
+        await fetch('/reproduce/selected-tables', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ selected: selectedTables })
+        });
+
         const btn = document.getElementById('startBtn');
         btn.disabled  = true;
         btn.innerHTML = '&#x23F3; Processing…';
@@ -1011,11 +1200,13 @@
         setStatus('Running…', 'running');
         setProgress(0, 'Initialising…');
         appendLog('[INFO] Starting reproduction process…', 'log-info');
+        appendLog(`[INFO] ${selectedTables.length} bảng được chọn.`, 'log-info');
         try {
+            const payload = Object.assign(readReproConfig(), { selected_tables: selectedTables });
             const resp = await fetch('/reproduce/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(readReproConfig())
+                body: JSON.stringify(payload)
             });
             const result = await resp.json();
             if (result.status === 'error') {
@@ -1031,7 +1222,7 @@
             setStatus('Error', 'error');
         } finally {
             btn.disabled  = false;
-            btn.innerHTML = '&#x25B6; Start Reproduction Process';
+            btn.innerHTML = '&#x25B6; Bắt đầu Migration';
         }
     }
 

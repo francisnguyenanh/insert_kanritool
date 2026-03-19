@@ -2,6 +2,6 @@
   "src_conn_str": "DRIVER={SQL Server};SERVER=VJP-LAP0270\\SQLEXPRESS;UID=sa;PWD=J123456",
   "dst_conn_str": "DRIVER={SQL Server};SERVER=VJP-LAP0270\\SQLEXPRESS;UID=sa;PWD=J123456",
   "src_db_name": "QC01_社内ツール開発_Ver1.0",
-  "dst_db_name": "demo1",
+  "dst_db_name": "",
   "rows_per_table": 1000
 }

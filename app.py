@@ -619,7 +619,8 @@ def gen_excel():
 #  Reproduce DB — config helpers
 # ─────────────────────────────────────────────────────────────
 
-_REPRODUCE_CONFIG_FILE = 'reproduce_config.json'
+_REPRODUCE_CONFIG_FILE          = 'reproduce_config.json'
+_SELECTED_TABLES_FILE          = 'reproduce_selected_tables.json'
 _REPRODUCE_CONFIG_DEFAULTS = {
     'src_conn_str':   '',
     'dst_conn_str':   '',
@@ -727,9 +728,9 @@ def _run_migration(cfg):
             finish(False)
             return
 
-        # ── Step 2: Connect to source DB and fetch table list ──
+        # ── Step 2: Connect to source DB (and optionally fetch table list) ──
         log(f"Connecting to source database '{src_db_name}'…")
-        set_progress(5, 'Fetching table list…')
+        set_progress(5, 'Connecting to source…')
         try:
             upper = src_conn_str.upper()
             if 'DATABASE=' not in upper and 'INITIAL CATALOG=' not in upper:
@@ -737,13 +738,19 @@ def _run_migration(cfg):
             else:
                 src_full = src_conn_str
             source_conn = pyodbc.connect(src_full)
-            tables_df = pd.read_sql(
-                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
-                "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME",
-                source_conn
-            )
-            table_list = tables_df['TABLE_NAME'].tolist()
-            log(f"Found {len(table_list)} table(s) to copy.")
+
+            selected_tables = cfg.get('selected_tables')
+            if selected_tables:
+                table_list = list(selected_tables)
+                log(f"{len(table_list)} bảng được chọn để copy.")
+            else:
+                tables_df = pd.read_sql(
+                    "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME",
+                    source_conn
+                )
+                table_list = tables_df['TABLE_NAME'].tolist()
+                log(f"Found {len(table_list)} table(s) to copy.")
         except Exception as e:
             log(f"Failed to connect to source database: {e}", 'ERROR')
             finish(False)
@@ -867,6 +874,57 @@ def reproduce_db_page():
     return render_template('reproduce_db.html')
 
 
+@app.route('/reproduce/tables', methods=['POST'])
+def reproduce_tables():
+    """Fetch all BASE TABLE names from the source DB (used by Step 1 on the frontend)."""
+    data = request.get_json() or {}
+    src_conn_str = (data.get('src_conn_str') or '').strip()
+    src_db_name  = (data.get('src_db_name')  or '').strip()
+    if not src_conn_str or not src_db_name:
+        return jsonify({'status': 'error', 'message': 'src_conn_str và src_db_name là bắt buộc.'})
+    try:
+        upper = src_conn_str.upper()
+        if 'DATABASE=' not in upper and 'INITIAL CATALOG=' not in upper:
+            src_full = src_conn_str + f';DATABASE={src_db_name}'
+        else:
+            src_full = src_conn_str
+        conn = pyodbc.connect(src_full, timeout=15)
+        df   = pd.read_sql(
+            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+            "WHERE TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME",
+            conn
+        )
+        conn.close()
+        return jsonify({'status': 'success', 'tables': df['TABLE_NAME'].tolist()})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+
+@app.route('/reproduce/selected-tables', methods=['GET', 'POST'])
+def reproduce_selected_tables():
+    """Persist the user's checked table list so subsequent fetches can restore it."""
+    path = os.path.join(get_script_dir(), _SELECTED_TABLES_FILE)
+    if request.method == 'GET':
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return jsonify({'status': 'success', 'selected': data.get('selected', [])})
+        except FileNotFoundError:
+            return jsonify({'status': 'success', 'selected': []})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e), 'selected': []})
+    body     = request.get_json() or {}
+    selected = body.get('selected', [])
+    if not isinstance(selected, list):
+        return jsonify({'status': 'error', 'message': 'selected must be a list.'})
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump({'selected': selected}, f, ensure_ascii=False, indent=2)
+        return jsonify({'status': 'success', 'message': f'{len(selected)} bảng đã được lưu.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+
+
 @app.route('/reproduce/config', methods=['GET', 'POST'])
 def reproduce_config():
     if request.method == 'GET':
@@ -901,12 +959,20 @@ def reproduce_start():
     # Merge posted values on top of saved config so UI changes take effect immediately
     posted = request.get_json() or {}
     cfg = _get_reproduce_config()
+    from datetime import datetime
     for k in _REPRODUCE_CONFIG_DEFAULTS:
         if posted.get(k) not in (None, ''):
             cfg[k] = posted[k]
+    # Auto-generate dst_db_name if not provided
+    if not cfg.get('dst_db_name'):
+        now = datetime.now().strftime('%Y%m%d%H%M')
+        cfg['dst_db_name'] = f"db_{now}"
+    # Pass selected table list directly (not stored in _REPRODUCE_CONFIG_DEFAULTS)
+    if posted.get('selected_tables'):
+        cfg['selected_tables'] = posted['selected_tables']
 
     threading.Thread(target=_run_migration, args=(cfg,), daemon=True).start()
-    return jsonify({'status': 'success', 'message': 'Migration started.'})
+    return jsonify({'status': 'success', 'message': f"Migration started. New Local DB: {cfg['dst_db_name']}"})
 
 
 @app.route('/reproduce/status', methods=['GET'])
