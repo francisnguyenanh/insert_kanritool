@@ -3,357 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DB Tool Suite</title>
+    <title>Kanri Tool Suite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ── Reset ─────────────────────────────────── */
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: Arial, sans-serif;
-            background: #f0f0f0;
-            min-height: 100vh;
-            display: flex;
-        }
+        /* ── Reset & Base ─────────────────────────────────── */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background: #f4f7fe; min-height: 100vh; display: flex; color: #2b3674; }
 
         /* ══════════════════════════════════════════════
-           LEFT SIDEBAR
+           LEFT SIDEBAR (Glass/Gradient)
         ══════════════════════════════════════════════ */
         .sidebar {
-            width: 196px;
-            min-height: 100vh;
-            background: linear-gradient(180deg, #1a5c9e 0%, #0d3b6e 100%);
-            display: flex;
-            flex-direction: column;
-            flex-shrink: 0;
-            position: sticky;
-            top: 0;
-            height: 100vh;
+            width: 260px; min-height: 100vh;
+            background: linear-gradient(180deg, #110B3B 0%, #2A1D7A 100%);
+            display: flex; flex-direction: column; flex-shrink: 0;
+            position: sticky; top: 0; height: 100vh;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 4px 0 20px rgba(0,0,0,0.1);
+            color: #fff;
         }
         .sidebar-brand {
-            padding: 18px 16px 14px;
-            color: #fff;
-            font-size: 14px;
-            font-weight: bold;
-            border-bottom: 1px solid rgba(255,255,255,0.15);
-            letter-spacing: 0.03em;
-            line-height: 1.4;
+            padding: 30px 24px 20px; font-size: 20px; font-weight: 700;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            letter-spacing: 0.02em; line-height: 1.3;
         }
         .sidebar-brand small {
-            display: block;
-            font-size: 11px;
-            font-weight: normal;
-            opacity: 0.55;
-            margin-top: 2px;
+            display: block; font-size: 12px; font-weight: 400;
+            opacity: 0.6; margin-top: 4px; color: #e0e5f2;
         }
-        .sidebar-menu {
-            list-style: none;
-            padding: 10px 0;
-        }
+        .sidebar-menu { list-style: none; padding: 24px 16px; display: flex; flex-direction: column; gap: 8px; }
         .sidebar-menu li a {
-            display: flex;
-            align-items: center;
-            gap: 9px;
-            padding: 12px 16px;
-            color: rgba(255,255,255,0.72);
-            text-decoration: none;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            border-left: 3px solid transparent;
-            transition: background 0.14s, color 0.14s;
+            display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+            color: rgba(255,255,255,0.6); text-decoration: none; font-size: 14px; font-weight: 500;
+            border-radius: 12px; cursor: pointer; transition: all 0.2s ease;
         }
-        .sidebar-menu li a:hover {
-            background: rgba(255,255,255,0.1);
-            color: #fff;
-        }
+        .sidebar-menu li a:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .sidebar-menu li a.active {
-            background: rgba(255,255,255,0.16);
-            color: #fff;
-            border-left-color: #7ec8f5;
+            background: #4318FF; color: #fff;
+            box-shadow: 0 4px 15px rgba(67, 24, 255, 0.4);
         }
-        .menu-icon { font-size: 16px; width: 20px; text-align: center; }
+        .menu-icon { font-size: 18px; width: 20px; text-align: center; }
 
         /* ══════════════════════════════════════════════
            MAIN AREA
         ══════════════════════════════════════════════ */
-        .main {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* ── Page panels (one per sidebar item) ──── */
-        .page-panel { display: none; }
+        .main { flex: 1; overflow-y: auto; padding: 40px 50px; display: flex; flex-direction: column; }
+        .page-panel { display: none; animation: fadeIn 0.4s ease forwards; }
         .page-panel.active { display: block; }
-
-        /* ══════════════════════════════════════════════
-           INNER TAB BAR (Processing / Config)
-        ══════════════════════════════════════════════ */
-        .tab-bar {
-            display: flex;
-            border-bottom: 2px solid #bbb;
-            background: #f5f5f5;
-            border-radius: 6px 6px 0 0;
-        }
-        .tab-btn {
-            padding: 9px 22px;
-            font-size: 13px;
-            font-weight: bold;
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            color: #555;
-            width: auto;
-            transition: color 0.13s, border-color 0.13s;
-        }
-        .tab-btn:hover:not(:disabled) { background: #e8e8e8; color: #222; }
-        .tab-btn.active { color: #1a5c9e; border-bottom-color: #1a5c9e; background: #fff; }
-
-        .tab-panel { display: none; padding: 20px 24px 24px; }
-        .tab-panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ══════════════════════════════════════════════
            CARD WRAPPER
         ══════════════════════════════════════════════ */
         .card {
-            background: #fff;
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.13);
-            overflow: hidden;
-            max-width: 560px;
+            background: #ffffff; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(112, 144, 176, 0.12);
+            overflow: hidden; max-width: 800px; width: 100%; margin: 0 auto;
         }
-        .card.wide { max-width: 780px; }
 
         /* ══════════════════════════════════════════════
-           FORM COMPONENTS  (same as original)
+           INNER TAB BAR
         ══════════════════════════════════════════════ */
-        h2 { text-align: center; margin-bottom: 16px; font-size: 16px; color: #222; }
-
-        fieldset {
-            border: 1px solid #bbb;
-            border-radius: 5px;
-            padding: 14px 16px 10px;
-            margin-bottom: 14px;
+        .tab-bar {
+            display: flex; gap: 10px; padding: 20px 24px 0; background: #fff;
+            border-bottom: 2px solid #f4f7fe;
         }
-        .form-row { display: flex; align-items: center; margin-bottom: 9px; gap: 8px; }
-        label { width: 165px; font-size: 13px; color: #333; flex-shrink: 0; }
-
-        input[type="text"],
-        input[type="date"] {
-            flex: 1;
-            padding: 4px 7px;
-            font-size: 13px;
-            border: 1px solid #aaa;
-            border-radius: 3px;
-            height: 26px;
+        .tab-btn {
+            padding: 12px 24px; font-size: 14px; font-weight: 600;
+            background: transparent; border: none; border-bottom: 3px solid transparent;
+            cursor: pointer; color: #a3aed1; transition: all 0.2s;
         }
-        input[type="file"] { flex: 1; font-size: 13px; }
-        input[type="text"]:disabled,
-        input[type="date"]:disabled { background: #e9e9e9; color: #888; }
+        .tab-btn:hover:not(:disabled) { color: #2b3674; }
+        .tab-btn.active { color: #4318FF; border-bottom-color: #4318FF; }
 
-        .table-section-label { font-size: 13px; color: #333; margin-bottom: 4px; }
+        .tab-panel { display: none; padding: 30px 40px; }
+        .tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
+
+        /* ══════════════════════════════════════════════
+           FORM COMPONENTS
+        ══════════════════════════════════════════════ */
+        h2 { font-size: 22px; color: #2b3674; margin-bottom: 24px; font-weight: 700; }
+        fieldset { border: none; margin-bottom: 24px; }
+        legend { font-size: 14px; font-weight: 700; color: #2b3674; margin-bottom: 12px; }
+
+        .form-row { display: flex; align-items: center; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
+        label { width: 180px; font-size: 14px; font-weight: 500; color: #2b3674; flex-shrink: 0; }
+
+        input[type="text"], input[type="date"], input[type="number"] {
+            flex: 1; min-width: 200px; padding: 12px 16px; font-size: 14px;
+            border: 1px solid #e2e8f0; border-radius: 10px; background: #fcfcfd;
+            color: #2b3674; transition: border 0.2s, box-shadow 0.2s;
+        }
+        input[type="file"] { flex: 1; font-size: 14px; padding: 8px 0; }
+        input:focus, textarea:focus { border-color: #4318FF; box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.1); outline: none; }
+        input:disabled { background: #e9ecef; color: #a3aed1; cursor: not-allowed; }
+
+        .table-section-label { font-size: 13px; font-weight: 600; color: #a3aed1; margin-bottom: 8px; display: block; }
+        .hint { font-size: 12px; color: #a3aed1; margin-top: -8px; margin-bottom: 16px; margin-left: 196px; }
 
         textarea {
-            width: 100%;
-            height: 100px;
-            font-size: 12px;
-            padding: 5px 7px;
-            border: 1px solid #aaa;
-            border-radius: 3px;
-            resize: vertical;
-            background: #fafafa;
-            font-family: monospace;
-            margin-bottom: 9px;
+            width: 100%; height: 120px; font-size: 13px; padding: 12px 16px;
+            border: 1px solid #e2e8f0; border-radius: 10px; resize: vertical;
+            background: #fcfcfd; font-family: 'Courier New', monospace; color: #2b3674; margin-bottom: 16px;
+            transition: border 0.2s, box-shadow 0.2s;
         }
 
-        .btn-row { display: flex; justify-content: center; margin-bottom: 8px; }
-
+        .btn-row { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; margin-bottom: 16px; }
+        
         button {
-            padding: 6px 0;
-            font-size: 13px;
-            border: 1px solid #888;
-            border-radius: 3px;
-            background: #e0e0e0;
-            cursor: pointer;
-            width: 240px;
+            padding: 12px 24px; font-size: 14px; font-weight: 600; min-width: 140px;
+            border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s ease;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
         }
-        button:hover:not(:disabled) { background: #c8d0dc; }
-        button:disabled { opacity: 0.45; cursor: not-allowed; }
-
-        .status-msg {
-            text-align: center;
-            margin-top: 10px;
-            font-size: 13px;
-            padding: 7px 10px;
-            border-radius: 4px;
-            display: none;
-            line-height: 1.4;
+        .btn-primary {
+            background: linear-gradient(135deg, #4318FF 0%, #868CFF 100%);
+            color: #fff; box-shadow: 0 4px 14px rgba(67, 24, 255, 0.3);
         }
-        .status-msg.success { background: #d4edda; color: #155724; border: 1px solid #b8dfc5; }
-        .status-msg.error   { background: #f8d7da; color: #721c24; border: 1px solid #f0b8bc; }
-        .status-msg.warning { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
-        .status-msg.info    { background: #d1ecf1; color: #0c5460; border: 1px solid #9bd4e0; }
-
-        .hint { font-size: 11px; color: #888; margin-top: -6px; margin-bottom: 8px; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(67, 24, 255, 0.4); }
+        .btn-secondary { background: #f4f7fe; color: #4318FF; }
+        .btn-secondary:hover:not(:disabled) { background: #e0e5f2; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        /* ══════════════════════════════════════════════
+           STATUS MESSAGES
+        ══════════════════════════════════════════════ */
+        .status-msg, .repro-alert {
+            text-align: left; margin-top: 16px; font-size: 14px; padding: 12px 16px;
+            border-radius: 10px; display: none; line-height: 1.5; font-weight: 500;
+            animation: fadeIn 0.3s ease;
+        }
+        .success { background: #e5f9e7; color: #05822b; border: 1px solid #bceab7; }
+        .error   { background: #ffebeb; color: #d62222; border: 1px solid #ffcdcd; }
+        .warning { background: #fff8e1; color: #b78103; border: 1px solid #ffecb3; }
+        .info    { background: #eaf1ff; color: #2a61e3; border: 1px solid #d0e1ff; }
 
         /* ══════════════════════════════════════════════
            DB REPRODUCER SPECIFIC STYLES
         ══════════════════════════════════════════════ */
         .repro-header {
-            background: linear-gradient(135deg, #1a5c9e 0%, #0d3b6e 100%);
-            color: #fff;
-            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #110B3B 0%, #2A1D7A 100%);
+            color: #fff; padding: 30px 40px;
         }
-        .repro-header h1 { font-size: 1.15rem; font-weight: 700; margin: 0; }
-        .repro-header p  { font-size: 0.8rem; opacity: 0.8; margin: 3px 0 0; }
+        .repro-header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+        .repro-header p  { font-size: 14px; opacity: 0.8; margin: 0; }
 
         #log-output {
-            background: #0d0d0d;
-            color: #00e676;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 0.8rem;
-            border-radius: 6px;
-            padding: 1rem;
-            min-height: 280px;
-            max-height: 400px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-            border: 1px solid #333;
+            background: #111c44; color: #00e676; font-family: 'Courier New', Courier, monospace;
+            font-size: 13px; border-radius: 12px; padding: 16px;
+            min-height: 300px; max-height: 400px; overflow-y: auto;
+            white-space: pre-wrap; word-break: break-all; border: none;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
         }
         #log-output .log-info    { color: #64b5f6; }
         #log-output .log-success { color: #69f0ae; }
         #log-output .log-warning { color: #ffd740; }
         #log-output .log-error   { color: #ff5252; }
 
-        #startBtn {
-            width: auto;
-            padding: 0.6rem 2rem;
-            font-size: 14px;
-            font-weight: 700;
-            background: #1a5c9e;
-            color: #fff;
-            border-color: #1a5c9e;
-        }
-        #startBtn:hover:not(:disabled) { background: #154e8a; }
-
         .repro-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.78rem;
-            font-weight: 600;
-            background: #bbb;
-            color: #333;
+            display: inline-block; padding: 6px 14px; border-radius: 20px;
+            font-size: 12px; font-weight: 600; background: #e9ecef; color: #2b3674;
         }
-        .repro-badge.running { background: #ffc107; color: #333; }
-        .repro-badge.done    { background: #28a745; color: #fff; }
-        .repro-badge.failed  { background: #dc3545; color: #fff; }
-        .repro-badge.error   { background: #dc3545; color: #fff; }
+        .repro-badge.running { background: #ffece5; color: #ff7043; }
+        .repro-badge.done    { background: #e5f9e7; color: #05822b; }
+        .repro-badge.failed  { background: #ffebeb; color: #d62222; }
+        .repro-badge.error   { background: #ffebeb; color: #d62222; }
 
-        .repro-progress { margin-bottom: 14px; display: none; }
+        .repro-progress { margin-bottom: 24px; display: none; }
         .repro-progress-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.78rem;
-            margin-bottom: 4px;
+            display: flex; justify-content: space-between; font-size: 13px;
+            margin-bottom: 8px; font-weight: 600; color: #2b3674;
         }
         .progress-outer {
-            background: #e0e0e0;
-            border-radius: 4px;
-            height: 8px;
-            overflow: hidden;
+            background: #e9ecef; border-radius: 8px; height: 10px; overflow: hidden;
         }
         .progress-inner {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #1a5c9e, #4a9fe0);
-            border-radius: 4px;
-            transition: width 0.35s ease;
+            height: 100%; width: 0%; background: linear-gradient(90deg, #4318FF, #00C6FF);
+            border-radius: 8px; transition: width 0.4s ease;
         }
 
-        .repro-fieldset {
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            padding: 14px 16px 10px;
-            margin-bottom: 16px;
-        }
-        .repro-fieldset legend { font-size: 0.8rem; font-weight: 700; color: #444; padding: 0 5px; }
-        .repro-label { display: block; font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 4px; }
-        .repro-input {
-            width: 100%;
-            padding: 6px 10px;
-            font-size: 0.85rem;
-            border: 1px solid #aaa;
-            border-radius: 4px;
-        }
-        .repro-hint { font-size: 0.75rem; color: #666; margin-top: 3px; }
-        .repro-row { margin-bottom: 14px; }
-        .repro-row:last-child { margin-bottom: 0; }
-
-        .repro-alert {
-            padding: 8px 14px;
-            border-radius: 4px;
-            font-size: 0.83rem;
-            margin-top: 12px;
-            display: none;
-        }
-        .repro-alert.success { background: #d4edda; color: #155724; border: 1px solid #b8dfc5; }
-        .repro-alert.error   { background: #f8d7da; color: #721c24; border: 1px solid #f0b8bc; }
-
-        .repro-btn-row { display: flex; justify-content: flex-end; gap: 8px; }
-        .repro-save-btn {
-            width: auto;
-            padding: 5px 18px;
-            font-size: 12px;
-            background: #28a745;
-            color: #fff;
-            border-color: #28a745;
-        }
-        .repro-save-btn:hover:not(:disabled) { background: #218838; }
-        .repro-reload-btn {
-            width: auto;
-            padding: 5px 14px;
-            font-size: 12px;
-        }
-
-        /* ── Step indicator ─────────────────────── */
-        .step-section { margin-bottom: 4px; }
-        .step-header  { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .step-section { margin-bottom: 8px; }
+        .step-header  { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
         .step-number  {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 24px; height: 24px; border-radius: 50%;
-            background: #1a5c9e; color: #fff;
-            font-size: 12px; font-weight: 700; flex-shrink: 0;
+            width: 32px; height: 32px; border-radius: 50%;
+            background: #eaf1ff; color: #4318FF;
+            font-size: 14px; font-weight: 700; flex-shrink: 0;
         }
-        .step-title { font-size: 13px; font-weight: 700; color: #333; }
-        .step-divider { border: none; border-top: 1px solid #e0e0e0; margin: 16px 0; }
+        .step-title { font-size: 16px; font-weight: 700; color: #2b3674; }
+        .step-divider { border: none; border-top: 1px dashed #e2e8f0; margin: 24px 0; }
 
-        /* ── Table check list ───────────────────── */
-        #fetchTablesBtn {
-            width: auto; padding: 5px 16px; font-size: 13px;
-            background: #1a5c9e; color: #fff; border-color: #1a5c9e;
-        }
-        #fetchTablesBtn:hover:not(:disabled) { background: #154e8a; }
-        #fetchStatus { font-size: 12px; color: #666; }
         .table-check-list {
-            max-height: 240px; overflow-y: auto;
-            border: 1px solid #ddd; border-radius: 4px;
-            background: #fff; padding: 4px 0;
+            max-height: 280px; overflow-y: auto; border: 1px solid #e2e8f0;
+            border-radius: 10px; background: #fcfcfd; padding: 8px;
         }
         .table-check-item {
-            display: flex; align-items: center; gap: 8px;
-            padding: 4px 10px; cursor: pointer;
-            font-size: 0.82rem; font-family: monospace;
-            border-bottom: 1px solid #f5f5f5;
+            display: flex; align-items: center; gap: 12px;
+            padding: 8px 12px; cursor: pointer;
+            font-size: 13px; border-radius: 6px; transition: background 0.2s;
+            color: #2b3674; font-weight: 500;
         }
-        .table-check-item:last-child { border-bottom: none; }
-        .table-check-item:hover { background: #f0f4ff; }
-        .table-check-item input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
+        .table-check-item:hover { background: #eaf1ff; }
+        .table-check-item input[type="checkbox"] { cursor: pointer; flex-shrink: 0; transform: scale(1.1); }
         .table-check-item.hidden { display: none; }
+        
+        .repro-hint { font-size: 12px; color: #a3aed1; margin-top: 6px; }
     </style>
 </head>
 <body>
@@ -363,23 +216,23 @@
 ══════════════════════════════════════════════ -->
 <nav class="sidebar">
     <div class="sidebar-brand">
-        &#x1F5C4; Bộ công cụ DB
-        <small>Các tiện ích cơ sở dữ liệu</small>
+        ✨ Kanri Suite
+        <small>Database & Automation Utilites</small>
     </div>
     <ul class="sidebar-menu">
         <li>
             <a class="active" onclick="switchPage('page-export')">
-                <span class="menu-icon">&#x1F4E4;</span>Tạo script SQL từ DB cũ sang DB mới
+                <span class="menu-icon">📤</span> Tạo script DB cũ > mới
             </a>
         </li>
         <li>
             <a onclick="switchPage('page-excel')">
-                <span class="menu-icon">&#x1F4C8;</span>Tạo script SQL từ thiết kế (Excel)
+                <span class="menu-icon">📊</span> Tạo script SQL từ Excel
             </a>
         </li>
         <li>
             <a onclick="switchPage('page-repro')">
-                <span class="menu-icon">&#x1F504;</span>Sao chép DB từ xa về máy
+                <span class="menu-icon">🔄</span> Sao chép DB từ xa
             </a>
         </li>
     </ul>
@@ -396,72 +249,74 @@
     <div id="page-export" class="page-panel active">
         <div class="card">
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchInnerTab('export', 'export-proc')">&#x1F4E4; Xử lý</button>
-                <button class="tab-btn"        onclick="switchInnerTab('export', 'export-cfg')">&#x2699; Cấu hình</button>
+                <button class="tab-btn active" onclick="switchInnerTab('export', 'export-proc')">Tác vụ</button>
+                <button class="tab-btn"        onclick="switchInnerTab('export', 'export-cfg')">Cấu hình DB</button>
             </div>
 
             <!-- Tab xử lý -->
             <div id="export-proc" class="tab-panel active">
-                <h2>Công cụ xuất DB</h2>
+                <h2>Xuất dữ liệu Database</h2>
                 <fieldset>
                     <div class="form-row">
-                        <label for="oldSystemId">System ID cũ:</label>
-                        <input type="text" id="oldSystemId" oninput="checkExportInputs()" autocomplete="off" />
+                        <label for="oldSystemId">System ID hiện tại:</label>
+                        <input type="text" id="oldSystemId" oninput="checkExportInputs()" autocomplete="off" placeholder="Nhập ID hệ thống cũ..." />
                     </div>
                     <div class="form-row">
                         <label for="newSystemId">System ID mới:</label>
-                        <input type="text" id="newSystemId" oninput="checkExportInputs()" autocomplete="off" />
+                        <input type="text" id="newSystemId" oninput="checkExportInputs()" autocomplete="off" placeholder="Nhập ID hệ thống mới..." />
                     </div>
                     <div class="form-row">
-                        <label for="currentMaxFileId">Max File ID hiện tại:</label>
+                        <label for="currentMaxFileId">Max File ID:</label>
                         <input type="text" id="currentMaxFileId" disabled autocomplete="off" />
                     </div>
-                    <p class="table-section-label">Các bảng có System ID khớp</p>
-                    <textarea id="tableList" readonly></textarea>
+                    <div style="margin-top:20px;">
+                        <span class="table-section-label">Danh sách bảng chứa dữ liệu khớp System ID:</span>
+                        <textarea id="tableList" readonly placeholder="Danh sách bảng sẽ hiển thị ở đây sau khi kết nối..."></textarea>
+                    </div>
                 </fieldset>
-                <div class="btn-row">
-                    <button id="connectBtn" onclick="connectToDb()" disabled>Kết nối Database</button>
+                
+                <div class="btn-row" style="justify-content: flex-start; border-bottom: 1px dashed #e2e8f0; padding-bottom: 24px; margin-bottom: 24px;">
+                    <button id="connectBtn" class="btn-primary" onclick="connectToDb()" disabled>🔌 Kiểm tra & Kết nối DB</button>
                 </div>
-                <div class="btn-row">
-                    <button id="exportMultiBtn" onclick="exportData('multi')" disabled>Xuất dữ liệu nhiều file (.zip)</button>
-                </div>
-                <div class="btn-row">
-                    <button id="exportSingleBtn" onclick="exportData('single')" disabled>Xuất dữ liệu 1 file (.sql)</button>
+                
+                <div class="btn-row" style="justify-content: flex-start;">
+                    <button id="exportMultiBtn" class="btn-secondary" onclick="exportData('multi')" disabled>📦 Tải file .zip (đa file)</button>
+                    <button id="exportSingleBtn" class="btn-secondary" onclick="exportData('single')" disabled>📄 Tải file .sql (đơn)</button>
                 </div>
                 <div id="exportStatus" class="status-msg"></div>
             </div>
 
             <!-- Tab cấu hình -->
             <div id="export-cfg" class="tab-panel">
-                <h2>Cấu hình xuất DB</h2>
+                <h2>Cấu hình chuỗi kết nối</h2>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Chuỗi kết nối</legend>
-                    <div style="margin-bottom:10px;">
-                        <p class="table-section-label" style="margin-bottom:4px;">data_string.txt (DB chính)</p>
-                        <input type="text" id="cfgDataString" style="width:100%;" autocomplete="off" />
+                    <legend>Thông tin máy chủ SQL</legend>
+                    <div class="form-row">
+                        <label>data_string.txt<br/><small style="font-size:11px;font-weight:400;color:#a3aed1;">(DB chính)</small></label>
+                        <input type="text" id="cfgDataString" autocomplete="off" />
                     </div>
-                    <div style="margin-bottom:10px;">
-                        <p class="table-section-label" style="margin-bottom:4px;">file_string.txt (DB file)</p>
-                        <input type="text" id="cfgFileString" style="width:100%;" autocomplete="off" />
+                    <div class="form-row">
+                        <label>file_string.txt<br/><small style="font-size:11px;font-weight:400;color:#a3aed1;">(DB chứa file)</small></label>
+                        <input type="text" id="cfgFileString" autocomplete="off" />
                     </div>
-                    <div>
-                        <p class="table-section-label" style="margin-bottom:4px;">dataconnectstring.txt</p>
-                        <input type="text" id="cfgDataConnect" style="width:100%;" autocomplete="off" />
+                    <div class="form-row">
+                        <label>dataconnect.txt<br/><small style="font-size:11px;font-weight:400;color:#a3aed1;">(DB logic)</small></label>
+                        <input type="text" id="cfgDataConnect" autocomplete="off" />
                     </div>
                 </fieldset>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Danh sách bảng</legend>
-                    <div style="margin-bottom:10px;">
-                        <p class="table-section-label" style="margin-bottom:4px;">table.txt</p>
-                        <textarea id="cfgTable" style="height:110px;"></textarea>
+                    <legend>Danh sách Table Mapping</legend>
+                    <div style="margin-bottom: 16px;">
+                        <span class="table-section-label">table.txt (Tất cả bảng)</span>
+                        <textarea id="cfgTable"></textarea>
                     </div>
                     <div>
-                        <p class="table-section-label" style="margin-bottom:4px;">table_logic.txt</p>
-                        <textarea id="cfgTableLogic" style="height:110px;"></textarea>
+                        <span class="table-section-label">table_logic.txt (Bảng logic)</span>
+                        <textarea id="cfgTableLogic"></textarea>
                     </div>
                 </fieldset>
                 <div class="btn-row">
-                    <button id="saveConfigBtn" onclick="saveConfig()">Lưu cấu hình</button>
+                    <button id="saveConfigBtn" class="btn-primary" onclick="saveConfig()">💾 Lưu Cấu Hình</button>
                 </div>
                 <div id="configStatus" class="status-msg"></div>
             </div>
@@ -474,75 +329,90 @@
     <div id="page-excel" class="page-panel">
         <div class="card">
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchInnerTab('excel', 'excel-proc')">&#x1F4C8; Xử lý</button>
-                <button class="tab-btn"        onclick="switchInnerTab('excel', 'excel-cfg')">&#x2699; Cấu hình</button>
+                <button class="tab-btn active" onclick="switchInnerTab('excel', 'excel-proc')">Tạo Script</button>
+                <button class="tab-btn"        onclick="switchInnerTab('excel', 'excel-cfg')">Cài đặt Sheet & Cột</button>
             </div>
 
             <!-- Tab xử lý -->
             <div id="excel-proc" class="tab-panel active">
-                <h2>Tạo script từ Excel</h2>
+                <h2>Trích xuất dữ liệu từ thiết kế Excel</h2>
                 <fieldset>
                     <div class="form-row">
-                        <label for="excelFile">File Excel (.xlsx):</label>
-                        <input type="file" id="excelFile" accept=".xlsx" />
+                        <label for="excelFile">File thiết kế (.xlsx):</label>
+                        <input type="file" id="excelFile" accept=".xlsx" style="background:transparent; border:none;" />
                     </div>
                     <div class="form-row">
-                        <label for="genSystemId">System ID:</label>
-                        <input type="text" id="genSystemId" placeholder="(không bắt buộc)" autocomplete="off" />
+                        <label for="genSystemId">Mã System ID:</label>
+                        <input type="text" id="genSystemId" placeholder="VD: 142055" autocomplete="off" />
                     </div>
-                    <p class="hint" style="margin-left:173px;">Nếu bỏ trống sẽ dùng thời gian hiện tại (HHMMSS)</p>
+                    <p class="hint">Bỏ trống sẽ tự động lấy thời gian hiện tại (định dạng HHMMSS).</p>
+                    
                     <div class="form-row">
-                        <label for="genSystemDate">Ngày System:</label>
+                        <label for="genSystemDate">Ngày hiệu lực:</label>
                         <input type="date" id="genSystemDate" />
                     </div>
-                    <p class="hint" style="margin-left:173px;">Nếu bỏ trống sẽ dùng ngày hôm nay</p>
+                    <p class="hint">Bỏ trống sẽ sử dụng ngày hôm nay.</p>
                 </fieldset>
                 <div class="btn-row">
-                    <button id="genBtn" onclick="genFromExcel()">Tạo insert_all.sql</button>
+                    <button id="genBtn" class="btn-primary" onclick="genFromExcel()">⚡ Bắt đầu tạo insert_all.sql</button>
                 </div>
                 <div id="excelStatus" class="status-msg"></div>
-                <div id="colWarnings" style="display:none;margin-top:10px;font-size:12px;
-                     border:1px solid #bbb;border-radius:4px;padding:10px 12px;
-                     background:#fffef0;max-height:260px;overflow-y:auto;"></div>
+                <!-- Box cảnh báo cột -->
+                <div id="colWarnings" style="display:none;margin-top:20px;font-size:13px;
+                     border:1px solid #ffecb3;border-radius:10px;padding:16px;
+                     background:#fff8e1;max-height:260px;overflow-y:auto;color:#2b3674;box-shadow: 0 4px 10px rgba(0,0,0,0.02)"></div>
             </div>
 
             <!-- Tab cấu hình -->
             <div id="excel-cfg" class="tab-panel">
-                <h2>Cấu hình tạo script</h2>
+                <h2>Tuỳ chỉnh trích xuất Excel</h2>
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Thiết lập người dùng (usernameID.txt)</legend>
+                    <legend>Tài khoản người dùng</legend>
                     <div class="form-row">
                         <label for="cfgUsernameId">Username ID:</label>
-                        <input type="text" id="cfgUsernameId" autocomplete="off" />
+                        <input type="text" id="cfgUsernameId" autocomplete="off" placeholder="ID mặc định chèn vào script..." />
                     </div>
                 </fieldset>
+                
+                <div style="display: flex; gap: 20px;">
+                    <fieldset style="flex:1;">
+                        <legend>Bộ lọc Sheet</legend>
+                        <span class="table-section-label">Danh sách Sheet bỏ qua</span>
+                        <textarea id="cfgExcludedSheets" placeholder="Mỗi dòng 1 tên sheet..."></textarea>
+                        
+                        <span class="table-section-label">Giá trị đánh dấu dừng quét</span>
+                        <textarea id="cfgStopValues" placeholder="Ví dụ: END, DỪNG..."></textarea>
+                    </fieldset>
+                    
+                    <fieldset style="flex:1;">
+                        <legend>Kiểm tra dữ liệu</legend>
+                        <span class="table-section-label">Bỏ qua kiểm tra cột (DB Check)</span>
+                        <textarea id="cfgSkipCheckColumns" placeholder="Các cột không cần đối soát với DB..."></textarea>
+                    </fieldset>
+                </div>
+
                 <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Lọc sheet</legend>
-                    <p class="table-section-label" style="margin-bottom:4px;">Tên sheet loại trừ (mỗi dòng 1 sheet)</p>
-                    <textarea id="cfgExcludedSheets" style="height:80px;"></textarea>
-                    <p class="table-section-label" style="margin-bottom:4px;">Giá trị dừng (mỗi dòng 1 giá trị)</p>
-                    <textarea id="cfgStopValues" style="height:100px;"></textarea>
+                    <legend>Quy tắc Map kiểu dữ liệu (Advanced JSON)</legend>
+                    <span class="table-section-label">Mapping Value Dictionary</span>
+                    <textarea id="cfgMappingValueDict"></textarea>
+                    
+                    <div style="display: flex; gap: 20px;">
+                        <div style="flex:1;">
+                            <span class="table-section-label">Koumoku Type Mapping</span>
+                            <textarea id="cfgKoumokuTypeMapping"></textarea>
+                        </div>
+                        <div style="flex:1;">
+                            <span class="table-section-label">Koumoku Type Mapping RE</span>
+                            <textarea id="cfgKoumokuTypeMappingRe"></textarea>
+                        </div>
+                    </div>
+                    
+                    <span class="table-section-label">Cấu hình bảng Table (TABLE_INFO.txt)</span>
+                    <textarea id="cfgTableInfo" style="height: 180px;"></textarea>
                 </fieldset>
-                <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Kiểm tra cột — Danh sách bỏ qua</legend>
-                    <p class="hint" style="margin-bottom:6px;margin-top:0;">Tên cột loại trừ khi kiểm tra INSERT vs DB. Mỗi dòng 1 tên, không phân biệt hoa thường.</p>
-                    <textarea id="cfgSkipCheckColumns" style="height:100px;"></textarea>
-                </fieldset>
-                <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">Ánh xạ kiểu dữ liệu (JSON)</legend>
-                    <p class="table-section-label" style="margin-bottom:4px;">Mapping Value Dict</p>
-                    <textarea id="cfgMappingValueDict" style="height:100px;font-family:monospace;"></textarea>
-                    <p class="table-section-label" style="margin-bottom:4px;">Koumoku Type Mapping</p>
-                    <textarea id="cfgKoumokuTypeMapping" style="height:130px;font-family:monospace;"></textarea>
-                    <p class="table-section-label" style="margin-bottom:4px;">Koumoku Type Mapping RE</p>
-                    <textarea id="cfgKoumokuTypeMappingRe" style="height:120px;font-family:monospace;"></textarea>
-                </fieldset>
-                <fieldset>
-                    <legend style="font-size:12px;color:#555;padding:0 4px;">TABLE_INFO.txt (raw JSON)</legend>
-                    <textarea id="cfgTableInfo" style="height:180px;font-family:monospace;font-size:11px;"></textarea>
-                </fieldset>
+
                 <div class="btn-row">
-                    <button id="saveExcelConfigBtn" onclick="saveExcelConfig()">Lưu cấu hình tạo script</button>
+                    <button id="saveExcelConfigBtn" class="btn-primary" onclick="saveExcelConfig()">💾 Lưu Quy Tắc Trích Xuất</button>
                 </div>
                 <div id="excelConfigStatus" class="status-msg"></div>
             </div>
@@ -553,40 +423,39 @@
          ║  PAGE 3: DB REPRODUCER              ║
          ╚══════════════════════════════════════╝ -->
     <div id="page-repro" class="page-panel">
-        <div class="card wide">
+        <div class="card wide" style="max-width: 900px;">
             <div class="repro-header">
-                <h1>&#x1F504; Công cụ sao chép DB</h1>
-                <p>Sao chép database SQL Server từ xa về máy để phát triển & kiểm thử.</p>
+                <h1>🔄 Công cụ đồng bộ Database</h1>
+                <p>Khôi phục và sao chép cấu trúc/dữ liệu từ máy chủ từ xa về Local Host để test & phát triển.</p>
             </div>
             <div class="tab-bar">
-                <button class="tab-btn active" onclick="switchInnerTab('repro', 'repro-proc')">&#x25B6; Điều khiển Migration</button>
-                <button class="tab-btn"        onclick="switchInnerTab('repro', 'repro-cfg')">&#x2699; Cấu hình</button>
+                <button class="tab-btn active" onclick="switchInnerTab('repro', 'repro-proc')">Trình điều khiển</button>
+                <button class="tab-btn"        onclick="switchInnerTab('repro', 'repro-cfg')">Tham số kết nối</button>
             </div>
 
             <!-- Migration Control tab -->
             <div id="repro-proc" class="tab-panel active">
-
+                
                 <!-- ── Step 1: Fetch Tables ──────────────────────── -->
                 <div class="step-section">
                     <div class="step-header">
                         <span class="step-number">1</span>
-                        <span class="step-title">Lấy danh sách bảng từ DB nguồn</span>
+                        <span class="step-title">Quét danh mục bảng dữ liệu nguồn</span>
                     </div>
-                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                        <button id="fetchTablesBtn" onclick="fetchTables()">&#x1F50D; Fetch Tables</button>
-                        <span id="fetchStatus"></span>
+                    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom: 20px;">
+                        <button id="fetchTablesBtn" class="btn-secondary" onclick="fetchTables()">🔍 Phân tích Database</button>
+                        <span id="fetchStatus" style="font-size: 14px; font-weight: 500;"></span>
                     </div>
 
                     <!-- Table list (hidden until fetched) -->
-                    <div id="tableListPanel" style="display:none;margin-top:12px;">
-                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
-                            <input type="text" id="tableSearch" placeholder="&#x1F50D; Tìm bảng..."
+                    <div id="tableListPanel" style="display:none; padding: 16px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+                            <input type="text" id="tableSearch" placeholder="🔍 Gõ tên bảng để tìm..."
                                 oninput="filterTableList(this.value)"
-                                style="flex:1;min-width:160px;max-width:260px;height:26px;
-                                       padding:3px 7px;font-size:12px;border:1px solid #aaa;border-radius:3px;" />
-                            <button onclick="toggleAllTables(true)"  style="width:auto;padding:3px 10px;font-size:12px;">&#x2611; Chọn tất cả</button>
-                            <button onclick="toggleAllTables(false)" style="width:auto;padding:3px 10px;font-size:12px;">&#x2610; Bỏ tất cả</button>
-                            <span id="selectionCount" style="font-size:12px;color:#1a5c9e;font-weight:600;white-space:nowrap;"></span>
+                                style="flex:1;min-width:200px;max-width:300px;background:#fff;" />
+                            <button class="btn-secondary" onclick="toggleAllTables(true)"  style="padding:8px 16px;font-size:13px;min-width:auto;">☑ Chọn tất</button>
+                            <button class="btn-secondary" onclick="toggleAllTables(false)" style="padding:8px 16px;font-size:13px;min-width:auto;">☐ Bỏ chọn</button>
+                            <span id="selectionCount" style="margin-left:auto;font-size:14px;color:#4318FF;font-weight:700;"></span>
                         </div>
                         <div id="tableCheckList" class="table-check-list"></div>
                     </div>
@@ -598,18 +467,19 @@
                 <div class="step-section">
                     <div class="step-header">
                         <span class="step-number">2</span>
-                        <span class="step-title">Thực hiện Migration</span>
+                        <span class="step-title">Khởi chạy quy trình đồng bộ</span>
                     </div>
-                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-                        <button id="startBtn" onclick="startReproduction()" disabled>
-                            &#x25B6; Bắt đầu Migration
+                    
+                    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+                        <button id="startBtn" class="btn-primary" onclick="startReproduction()" disabled>
+                            ▶ Tiến hành sao chép (Migration)
                         </button>
-                        <span id="statusBadge" class="repro-badge" style="display:none;">Idle</span>
+                        <span id="statusBadge" class="repro-badge" style="display:none;">Sẵn sàng</span>
                     </div>
 
                     <div id="progressWrapper" class="repro-progress">
                         <div class="repro-progress-labels">
-                            <span id="progressLabel">Processing...</span>
+                            <span id="progressLabel">Đang chuân bị...</span>
                             <span id="progressPercent">0%</span>
                         </div>
                         <div class="progress-outer">
@@ -617,12 +487,14 @@
                         </div>
                     </div>
 
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                        <span style="font-size:0.8rem;font-weight:600;color:#555;">Process Log</span>
-                        <button onclick="clearLog()" style="width:auto;padding:2px 12px;font-size:12px;">&#x1F5D1; Clear</button>
-                    </div>
-                    <div id="log-output">
-                        <span class="log-info">// Waiting to start...</span>
+                    <div style="background: #111c44; border-radius: 12px; padding: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.1);">
+                            <span style="font-size:13px;font-weight:600;color:#fff;">Console Output</span>
+                            <button onclick="clearLog()" style="background:rgba(255,255,255,0.1);color:#fff;padding:6px 12px;font-size:12px;min-width:auto;border-radius:6px;border:none;">🧹 Xoá Log</button>
+                        </div>
+                        <div id="log-output">
+                            <span class="log-info">// Đang chờ thao tác...</span>
+                        </div>
                     </div>
                 </div>
 
@@ -632,56 +504,49 @@
             <div id="repro-cfg" class="tab-panel">
                 <form id="reproConfigForm" onsubmit="saveReproConfig(event)" novalidate>
 
-                    <div class="repro-fieldset">
-                        <fieldset style="border:none;padding:0;margin:0;">
-                            <legend>Chuỗi kết nối</legend>
-                            <div class="repro-row">
-                                <label class="repro-label">SQL Server A (Nguồn) <span style="color:red;">*</span></label>
-                                <input type="text" class="repro-input" id="srcConnStr" autocomplete="off"
-                                    placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=...;UID=sa;PWD=..." />
-                                <div class="repro-hint">Chuỗi kết nối đến SQL Server nguồn (Server A).</div>
-                            </div>
-                            <div class="repro-row">
-                                <label class="repro-label">SQL Server cục bộ (Đích) <span style="color:red;">*</span></label>
-                                <input type="text" class="repro-input" id="dstConnStr" autocomplete="off"
-                                    placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost\SQLEXPRESS;UID=sa;PWD=..." />
-                                <div class="repro-hint">Chuỗi kết nối đến SQL Server cục bộ (máy bạn).</div>
-                            </div>
-                        </fieldset>
-                    </div>
+                    <fieldset style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                        <legend style="background: #fff; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">Chuỗi kết nối SQL Server</legend>
+                        <div class="form-row">
+                            <label>Máy chủ NGUỒN:<span style="color:#d62222;margin-left:4px;">*</span></label>
+                            <input type="text" id="srcConnStr" autocomplete="off"
+                                placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=...;UID=sa;PWD=..." />
+                        </div>
+                        <p class="hint">Chuỗi kết nối ODBC đến server chứa dữ liệu thật.</p>
+                        
+                        <div class="form-row" style="margin-top: 16px;">
+                            <label>Máy chủ LOCAL:<span style="color:#d62222;margin-left:4px;">*</span></label>
+                            <input type="text" id="dstConnStr" autocomplete="off"
+                                placeholder="DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost\SQLEXPRESS;UID=sa;PWD=..." />
+                        </div>
+                        <p class="hint">Nơi sẽ tạo lập database bản sao.</p>
+                    </fieldset>
 
-                    <div class="repro-fieldset">
-                        <fieldset style="border:none;padding:0;margin:0;">
-                            <legend>Tên database</legend>
-                            <div style="display:flex;gap:16px;">
-                                <div style="flex:1;" class="repro-row">
-                                    <label class="repro-label">Database nguồn <span style="color:red;">*</span></label>
-                                    <input type="text" class="repro-input" id="srcDbName" autocomplete="off" placeholder="VD: Production_DB" />
-                                    <div class="repro-hint">Database trên Server A sẽ được sao chép dữ liệu.</div>
-                                </div>
-                                <div style="flex:1;" class="repro-row">
-                                    <label class="repro-label">Database cục bộ mới <span style="color:red;">*</span></label>
-                                    <input type="text" class="repro-input" id="dstDbName" autocomplete="off" placeholder="VD: Production_DB_Local" />
-                                    <div class="repro-hint">Sẽ được tạo trên SQL Server cục bộ của bạn.</div>
-                                </div>
+                    <fieldset style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                        <legend style="background: #fff; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">Tên Database</legend>
+                        <div style="display:flex;gap:24px;">
+                            <div style="flex:1;">
+                                <label style="margin-bottom:8px;display:block;">Tên DB Nguồn:<span style="color:#d62222;margin-left:4px;">*</span></label>
+                                <input type="text" id="srcDbName" autocomplete="off" placeholder="VD: Data_Production_DB" style="width:100%;" />
                             </div>
-                        </fieldset>
-                    </div>
-
-                    <div class="repro-fieldset">
-                        <fieldset style="border:none;padding:0;margin:0;">
-                            <legend>Tùy chọn sao chép</legend>
-                            <div style="max-width:260px;" class="repro-row">
-                                <label class="repro-label">Số dòng sao chép mỗi bảng</label>
-                                <input type="number" class="repro-input" id="rowsPerTable" value="1000" min="1" max="1000000" />
-                                <div class="repro-hint">Nhập 0 để sao chép toàn bộ (không giới hạn).</div>
+                            <div style="flex:1;">
+                                <label style="margin-bottom:8px;display:block;">Tên DB Đích (Tân tạo):<span style="color:#d62222;margin-left:4px;">*</span></label>
+                                <input type="text" id="dstDbName" autocomplete="off" placeholder="VD: Data_Production_DB_Local" style="width:100%;" />
                             </div>
-                        </fieldset>
-                    </div>
+                        </div>
+                    </fieldset>
 
-                    <div class="repro-btn-row">
-                        <button type="button" class="repro-reload-btn" onclick="loadReproConfig()">&#x21BA; Tải lại</button>
-                        <button type="submit" class="repro-save-btn" id="saveReproConfigBtn">&#x1F4BE; Lưu cấu hình</button>
+                    <fieldset style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                        <legend style="background: #fff; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">Tham số trích xuất</legend>
+                        <div class="form-row" style="margin-bottom: 0;">
+                            <label>Số Test Data mỗi bảng:</label>
+                            <input type="number" id="rowsPerTable" value="1000" min="1" max="1000000" style="max-width: 200px;" />
+                        </div>
+                        <p class="hint">Điền [0] để chép toàn bộ không giới hạn.</p>
+                    </fieldset>
+
+                    <div class="btn-row" style="margin-top: 24px;">
+                        <button type="button" class="btn-secondary" onclick="loadReproConfig()">🗘 Tải lại cấu hình</button>
+                        <button type="submit" class="btn-primary" id="saveReproConfigBtn">💾 Lưu Tham Số</button>
                     </div>
                     <div id="reproConfigStatus" class="repro-alert"></div>
 
@@ -691,7 +556,6 @@
     </div>
 
 </div><!-- /main -->
-
 <script>
     // ════════════════════════════════════════════════════════
     //  LAYOUT NAVIGATION
