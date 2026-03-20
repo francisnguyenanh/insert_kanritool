@@ -235,6 +235,11 @@
                 <span class="menu-icon">🔄</span> Sao chép DB từ xa
             </a>
         </li>
+        <li>
+            <a onclick="switchPage('page-compare')">
+                <span class="menu-icon">🖍️</span> So sánh & Tô màu
+            </a>
+        </li>
     </ul>
 </nav>
 
@@ -555,6 +560,35 @@
         </div>
     </div>
 
+    <!-- ╔══════════════════════════════════════╗
+         ║  PAGE 4: COMPARE EXCEL              ║
+         ╚══════════════════════════════════════╝ -->
+    <div id="page-compare" class="page-panel">
+        <div class="card">
+            <div class="tab-bar">
+                <button class="tab-btn active">So sánh & Tô màu Excel</button>
+            </div>
+            <div class="tab-panel active">
+                <h2>Công Cụ So Sánh Dữ Liệu</h2>
+                <fieldset>
+                    <div class="form-row">
+                        <label>File Excel OLD:</label>
+                        <input type="file" id="hlFileOld" accept=".xlsx" style="background:transparent; border:none;" />
+                    </div>
+                    <div class="form-row">
+                        <label>File Excel NEW:</label>
+                        <input type="file" id="hlFileNew" accept=".xlsx" style="background:transparent; border:none;" />
+                    </div>
+                    <p class="hint">Tải lên hai file Excel để chạy thuật toán tìm và đánh dấu dữ liệu thay đổi.</p>
+                </fieldset>
+                <div class="btn-row">
+                    <button id="compareBtn" class="btn-primary" onclick="compareExcel()">✨ Bắt Đầu So Sánh</button>
+                </div>
+                <div id="compareStatus" class="status-msg"></div>
+            </div>
+        </div>
+    </div>
+
 </div><!-- /main -->
 <script>
     // ════════════════════════════════════════════════════════
@@ -774,6 +808,46 @@
             showMsg('excelStatus', 'Network error: ' + err.message, 'error');
         } finally {
             setBusy(btn, false, 'Generate insert_all.sql');
+        }
+    }
+
+    
+    // ════════════════════════════════════════════════════════
+    //  HIGHLIGHT TOOL
+    // ════════════════════════════════════════════════════════
+    async function compareExcel() {
+        const fileOld = document.getElementById('hlFileOld');
+        const fileNew = document.getElementById('hlFileNew');
+        if (!fileOld.files.length || !fileNew.files.length) {
+            showMsg('compareStatus', 'Vui lòng chọn cả 2 file OLD và NEW.', 'error');
+            return;
+        }
+        
+        const btn = document.getElementById('compareBtn');
+        setBusy(btn, true, 'Đang phân tích & tô màu...');
+        hideMsg('compareStatus');
+        
+        const formData = new FormData();
+        formData.append('file_old', fileOld.files[0]);
+        formData.append('file_new', fileNew.files[0]);
+        
+        try {
+            const resp = await fetch('/compare_excel', { method: 'POST', body: formData });
+            
+            const ct = resp.headers.get('content-type') || '';
+            if (resp.ok && ct.includes('application/zip')) {
+                await downloadBlob(resp, 'comparison_results.zip');
+                showMsg('compareStatus', 'Tải thành công! Mở file ZIP để xem file highlight và log.', 'success');
+                fileOld.value = '';
+                fileNew.value = '';
+            } else {
+                const result = await resp.json();
+                showMsg('compareStatus', result.message || 'Có lỗi xảy ra', 'error');
+            }
+        } catch (err) {
+            showMsg('compareStatus', 'Lỗi mạng: ' + err.message, 'error');
+        } finally {
+            setBusy(btn, false, '✨ Bắt Đầu So Sánh');
         }
     }
 
