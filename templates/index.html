@@ -240,6 +240,11 @@
                 <span class="menu-icon">🖍️</span> So sánh & Tô màu
             </a>
         </li>
+        <li>
+            <a onclick="switchPage('page-video')">
+                <span class="menu-icon">🎵</span> Chuyển Video sang MP3
+            </a>
+        </li>
     </ul>
 </nav>
 
@@ -589,6 +594,42 @@
         </div>
     </div>
 
+    <!-- ╔══════════════════════════════════════╗
+         ║  PAGE 5: VIDEO CONVERTER            ║
+         ╚══════════════════════════════════════╝ -->
+    <div id="page-video" class="page-panel">
+        <div class="card">
+            <div class="tab-bar">
+                <button class="tab-btn active">Chuyển Video thành MP3</button>
+            </div>
+            <div class="tab-panel active">
+                <h2>Công cụ trích xuất MP3</h2>
+                <fieldset>
+                    <div class="form-row">
+                        <label>File Video (Tối đa 20GB):</label>
+                        <input type="file" id="videoConvertFile" accept="video/*" style="background:transparent; border:none;" />
+                    </div>
+                    <p class="hint">Hỗ trợ các định dạng video thông dụng như .mp4, .avi, .mov, ...</p>
+                </fieldset>
+                
+                <!-- Hiển thị Loading Bar cho Upload / Convert -->
+                <div id="videoProgressWrapper" class="repro-progress" style="display:none; margin-top: 15px;">
+                    <div class="repro-progress-labels">
+                        <span id="videoProgressLabel">Đang tải lên...</span>
+                    </div>
+                    <div class="progress-outer">
+                        <div id="videoProgressBar" class="progress-inner"></div>
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button id="convertVideoBtn" class="btn-primary" onclick="convertVideo()">🎵 Convert & Tải MP3</button>
+                </div>
+                <div id="videoConvertStatus" class="status-msg"></div>
+            </div>
+        </div>
+    </div>
+
 </div><!-- /main -->
 <script>
     // ════════════════════════════════════════════════════════
@@ -600,7 +641,7 @@
         document.querySelectorAll('.page-panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.sidebar-menu li a').forEach(a => a.classList.remove('active'));
         document.getElementById(pageId).classList.add('active');
-        const order = ['page-export', 'page-excel', 'page-repro'];
+        const order = ['page-export', 'page-excel', 'page-repro', 'page-compare', 'page-video'];
         const idx = order.indexOf(pageId);
         if (idx !== -1) document.querySelectorAll('.sidebar-menu li a')[idx].classList.add('active');
     }
@@ -1256,6 +1297,104 @@
 
     // Auto-load reproduce config on page open
     loadReproConfig();
+    // ════════════════════════════════════════════════════════
+    //  PAGE 5: VIDEO CONVERTER
+    // ════════════════════════════════════════════════════════
+
+    function convertVideo() {
+        const fileInput = document.getElementById('videoConvertFile');
+        if (!fileInput.files.length) {
+            showMsg('videoConvertStatus', 'Please select a video file.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('convertVideoBtn');
+        setBusy(btn, true, 'Converting...');
+        hideMsg('videoConvertStatus');
+        
+        const wrapper = document.getElementById('videoProgressWrapper');
+        const progressBar = document.getElementById('videoProgressBar');
+        const progressLabel = document.getElementById('videoProgressLabel');
+        
+        wrapper.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressLabel.textContent = 'Đang tải lên và xử lý... (Tuỳ thuộc vào file có thể mất vài phút)';
+
+        const formData = new FormData();
+        formData.append('video', fileInput.files[0]);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/convert_video', true);
+        xhr.responseType = 'blob';
+
+        xhr.onload = function(e) {
+            if (this.status == 200) {
+                // Check if the response is actually a JSON error message instead of exactly a blob
+                const contentType = xhr.getResponseHeader('Content-Type');
+                if (contentType && contentType.includes('application/json')) {
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        const res = JSON.parse(reader.result);
+                        showMsg('videoConvertStatus', res.message || 'Error occurred.', 'error');
+                        setBusy(btn, false, '🎵 Convert & Tải MP3');
+                        wrapper.style.display = 'none';
+                    };
+                    reader.readAsText(xhr.response);
+                    return;
+                }
+
+                // Successful conversion -> trigger download
+                const blob = this.response;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                
+                let filename = 'converted.mp3';
+                const disposition = xhr.getResponseHeader('Content-Disposition');
+                if (disposition && disposition.indexOf('attachment') !== -1) {
+                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+                    if (matches != null && matches[1]) { 
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                
+                showMsg('videoConvertStatus', 'Chuyển đổi thành công! Đang tải xuống...', 'success');
+                fileInput.value = '';
+            } else {
+                showMsg('videoConvertStatus', 'Lỗi khi chuyển đổi video. (Mã lỗi: ' + this.status + ')', 'error');
+            }
+            setBusy(btn, false, '🎵 Convert & Tải MP3');
+            wrapper.style.display = 'none';
+        };
+
+        xhr.onerror = function() {
+            showMsg('videoConvertStatus', 'Lỗi kết nối. Vui lòng thử lại.', 'error');
+            setBusy(btn, false, '🎵 Convert & Tải MP3');
+            wrapper.style.display = 'none';
+        };
+        
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                if (percentComplete < 100) {
+                    progressBar.style.width = percentComplete + '%';
+                    progressLabel.textContent = 'Đang tải lên: ' + percentComplete.toFixed(1) + '%';
+                } else {
+                    progressBar.style.width = '100%';
+                    progressLabel.textContent = 'Đang chuyển đổi FFMPEG... Vui lòng chờ.';
+                }
+            }
+        };
+
+        xhr.send(formData);
+    }
+
 </script>
 </body>
 </html>

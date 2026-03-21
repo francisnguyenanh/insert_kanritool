@@ -16,8 +16,12 @@ from sqlalchemy import create_engine, text
 from flask import Flask, render_template, request, jsonify, session, send_file
 import genScriptFromExcel
 
+import uuid
+import subprocess
+
 app = Flask(__name__)
 app.secret_key = 'db_export_tool_secret_key_flask'
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024 * 1024
 
 
 def get_script_dir():
@@ -573,8 +577,56 @@ def compare_excel():
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 # ──────────────────────────────────────────────
-#  Config API
+#  Video Converter API
+# ──────────────────────────────────────────────
 
+@app.route('/convert_video', methods=['POST'])
+def convert_video():
+    if 'video' not in request.files:
+        return jsonify({'status': 'error', 'message': 'Không tìm thấy file video.'})
+    
+    file = request.files['video']
+    if not file.filename:
+        return jsonify({'status': 'error', 'message': 'Chưa chọn file.'})
+    
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        unique_id = str(uuid.uuid4())
+        ext = os.path.splitext(file.filename)[1]
+        if not ext:
+            ext = '.mp4'
+        input_path = os.path.join(tmp_dir, f"input_{unique_id}{ext}")
+        output_path = os.path.join(tmp_dir, f"output_{unique_id}.mp3")
+        
+        file.save(input_path)
+        
+        # Call FFMPEG
+        cmd = [
+            'ffmpeg', '-i', input_path,
+            '-q:a', '0', '-map', 'a',
+            output_path, '-y'
+        ]
+        
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Send file back
+        with open(output_path, 'rb') as f:
+            mp3_data = io.BytesIO(f.read())
+            
+        mp3_data.seek(0)
+        
+        download_name = os.path.splitext(file.filename)[0] + '.mp3'
+        return send_file(mp3_data, as_attachment=True, download_name=download_name, mimetype='audio/mpeg')
+        
+    except subprocess.CalledProcessError as e:
+        return jsonify({'status': 'error', 'message': f'Lỗi khi convert video (FFMPEG error).'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Lỗi hệ thống: {str(e)}'})
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+# ──────────────────────────────────────────────
+#  Config API
 # ──────────────────────────────────────────────
 
 CONFIG_FILES = {
